@@ -1,18 +1,18 @@
-CREATE DATABASE IF NOT EXISTS event_attendance_db;
+CREATE DATABASE event_attendance_db;
 USE event_attendance_db;
 
-CREATE TABLE IF NOT EXISTS roles (
+CREATE TABLE roles (
     role_id INT AUTO_INCREMENT PRIMARY KEY,
     role_name VARCHAR(30) NOT NULL UNIQUE
 );
 
-CREATE TABLE IF NOT EXISTS programs (
+CREATE TABLE programs (
     program_id INT AUTO_INCREMENT PRIMARY KEY,
     program_name VARCHAR(120) NOT NULL UNIQUE,
     department VARCHAR(120) NOT NULL
 );
 
-CREATE TABLE IF NOT EXISTS users (
+CREATE TABLE users (
     user_id INT AUTO_INCREMENT PRIMARY KEY,
     username VARCHAR(80) NOT NULL UNIQUE,
     password_hash VARCHAR(255) NOT NULL,
@@ -22,7 +22,7 @@ CREATE TABLE IF NOT EXISTS users (
         FOREIGN KEY (role_id) REFERENCES roles(role_id)
 );
 
-CREATE TABLE IF NOT EXISTS students (
+CREATE TABLE students (
     student_id INT AUTO_INCREMENT PRIMARY KEY,
     user_id INT NOT NULL UNIQUE,
     student_number VARCHAR(40) NOT NULL UNIQUE,
