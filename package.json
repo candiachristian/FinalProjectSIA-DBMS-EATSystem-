@@ -1,0 +1,26 @@
+{
+  "name": "eat-system",
+  "version": "1.0.0",
+  "description": "A student and admin system for creating events, registering students, recording attendance, and viewing reports.",
+  "main": "server.js",
+  "dependencies": {
+    "dotenv": "^18.0.9",
+    "express": "^5.3.0",
+    "mysql2": "^3.24.6"
+  },
+  "scripts": {
+    "start": "node server.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/candiachristian/FinalProjectSIA-DBMS-EATSystem-.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/candiachristian/FinalProjectSIA-DBMS-EATSystem-/issues"
+  },
+  "homepage": "https://github.com/candiachristian/FinalProjectSIA-DBMS-EATSystem-#readme"
+}
