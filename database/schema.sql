@@ -39,3 +39,31 @@ CREATE TABLE students (
     CONSTRAINT fk_students_programs
         FOREIGN KEY (program_id) REFERENCES programs(program_id)
 );
+
+CREATE TABLE registration (
+    registration_id INT AUTO_INCREMENT PRIMARY KEY,
+    student_id INT NOT NULL,
+    event_id INT NOT NULL,
+    registration_status_id INT NOT NULL,
+    registered_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+
+    UNIQUE KEY uq_registration_student_event (student_id, event_id),
+    FOREIGN KEY (student_id) REFERENCES students(student_id),
+    FOREIGN KEY (event_id) REFERENCES events(event_id),
+    FOREIGN KEY (registration_status_id) REFERENCES registration_statuses(registration_status_id)
+);
+
+CREATE TABLE registration_statuses (
+    registration_status_id INT AUTO_INCREMENT PRIMARY KEY,
+    status_name VARCHAR(50) NOT NULL UNIQUE,
+    description VARCHAR(255),
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+INSERT INTO registration_statuses
+    (status_name, description)
+VALUES
+    ('Pending', 'Registration is waiting for confirmation'),
+    ('Confirmed', 'Registration has been confirmed'),
+    ('Cancelled', 'Registration has been cancelled');
