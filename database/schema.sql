@@ -60,10 +60,3 @@ CREATE TABLE registration_statuses (
     description VARCHAR(255),
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
-
-INSERT INTO registration_statuses
-    (status_name, description)
-VALUES
-    ('Pending', 'Registration is waiting for confirmation'),
-    ('Confirmed', 'Registration has been confirmed'),
-    ('Cancelled', 'Registration has been cancelled');
