@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Dashboard · Events</title>
+    <link rel="stylesheet" href="style.css" />
+    <script src="app.js"></script>
+</head>
+
+<body>
+    <header>
+      <div class="brand">
+        <span class="brand-mark">📝</span>
+        <h1>Events · Admin</h1>
+      </div>
+
+      <button class="secondary" onclick="logout()">Log out</button>
+      
+    </header>
+
+    <main class="wrap">
+      <section class="hero">
+        <h2>Events, made present.</h2>
+
+        <p>Manage campus events and keep attendance in sync.</p>
+      </section>
+
+      <div class="cards">
+        <a class="card" href="add-event.html">
+            <span class="icon">＋</span>
+          <h3>Create an event</h3>
+          <p>Set date, schedule, venue and check-in grace period.</p>
+        </a>
+        
+        <a class="card" href="show-events.html"
+          ><span class="icon">▣</span>
+          <h3>Manage events</h3>
+          <p>Review, update, or remove your event listings.</p>
+        </a>
+        
+        <a class="card" href="attendance.html"
+          ><span class="icon">◉</span>
+          <h3>Attendance</h3>
+          <p>View rosters and manage student check-ins.</p>
+        </a>
+        
+        <a class="card" href="reports.html"
+          ><span class="icon">▤</span>
+          <h3>Reports</h3>
+          <p>Explore attendance summaries and print to PDF.</p>
+        </a>
+      </div>
+
+      <p class="foot">Event Attendance Tracking System</p>
+
+    </main>
+    <script>
+      requireRole("admin");
+    </script>
+  </body>
+</html>
