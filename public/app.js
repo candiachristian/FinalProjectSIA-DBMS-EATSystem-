@@ -83,7 +83,6 @@ function requireAdmin() {
   return true;
 }
 
-// Keep this alias if any page still calls requireRole("admin").
 function requireRole(role) {
   return role === "admin" ? requireAdmin() : false;
 }
