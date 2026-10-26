@@ -1,43 +1,66 @@
-const ADMIN = { username: "admin", password: "admin123" };
-const $ = (id) => document.getElementById(id);
+const ADMIN = {
+  username: "admin",
+  password: "admin123"
+};
 
-const esc = (s) =>
-  String(s ?? "").replace(
-    /[&<>"']/g,
-    (c) =>
-      ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[
-        c
-      ],
-  );
-const toMin = (t) => {
-  const [h, m] = String(t || "0:0")
-    .split(":")
-    .map(Number);
-  return h * 60 + m;
+const $ = id => document.getElementById(id);
+
+const esc = value =>
+  String(value ?? "").replace(/[&<>"']/g, character => ({
+    "&": "&amp;",
+    "<": "&lt;",
+    ">": "&gt;",
+    '"': "&quot;",
+    "'": "&#39;"
+  })[character]);
+
+const toMin = time => {
+  const [hours, minutes] = String(time || "0:0").split(":").map(Number);
+  return hours * 60 + minutes;
 };
-const fmt12 = (t) => {
-  if (!t) return "";
-  let [h, m] = t.split(":").map(Number);
-  return `${h % 12 || 12}:${String(m).padStart(2, "0")} ${h >= 12 ? "PM" : "AM"}`;
+
+const fmt12 = time => {
+  if (!time) return "";
+
+  let [hours, minutes] = time.split(":").map(Number);
+  const suffix = hours >= 12 ? "PM" : "AM";
+
+  hours = hours % 12 || 12;
+
+  return `${hours}:${String(minutes).padStart(2, "0")} ${suffix}`;
 };
-const eventDateTime = (e, t) => new Date(`${e.date}T${t}:00`);
-const eventStatus = (e) => {
-  const n = new Date(),
-    s = eventDateTime(e, e.start),
-    end = eventDateTime(e, e.end);
-  return n < s ? "Upcoming" : n > end ? "Completed" : "Ongoing";
+
+const eventDateTime = (event, time) =>
+  new Date(`${event.date}T${time}:00`);
+
+const eventStatus = event => {
+  const now = new Date();
+  const start = eventDateTime(event, event.start);
+  const end = eventDateTime(event, event.end);
+
+  if (now < start) return "Upcoming";
+  if (now > end) return "Completed";
+
+  return "Ongoing";
 };
-const toast = (msg) => {
-  let x = $("toast");
-  if (!x) {
-    x = document.createElement("div");
-    x.id = "toast";
-    x.className = "toast";
-    document.body.appendChild(x);
+
+function toast(message) {
+  let element = $("toast");
+
+  if (!element) {
+    element = document.createElement("div");
+    element.id = "toast";
+    element.className = "toast";
+    document.body.appendChild(element);
   }
-  x.textContent = msg;
-  setTimeout(() => x.remove(), 3300);
-};
+
+  element.textContent = message;
+
+  setTimeout(() => {
+    element.remove();
+  }, 3300);
+}
+
 function getSession() {
   try {
     return JSON.parse(localStorage.getItem("session"));
@@ -45,73 +68,46 @@ function getSession() {
     return null;
   }
 }
+
 function logout() {
   localStorage.removeItem("session");
   location.href = "log-in.html";
 }
-function requireRole(role) {
-  const s = getSession();
-  if (!s || s.role !== role) {
+
+function requireAdmin() {
+  if (getSession()?.role !== "admin") {
     location.href = "log-in.html";
     return false;
   }
+
   return true;
 }
+
+// Keep this alias if any page still calls requireRole("admin").
+function requireRole(role) {
+  return role === "admin" ? requireAdmin() : false;
+}
+
 function login() {
-  const role = window.loginRole || "student",
-    u = $("username").value.trim(),
-    p = $("password").value;
-  if (role === "admin" && u === ADMIN.username && p === ADMIN.password) {
-    localStorage.setItem("session", JSON.stringify({ role }));
+  const username = $("username").value.trim();
+  const password = $("password").value;
+
+  if (
+    username === ADMIN.username &&
+    password === ADMIN.password
+  ) {
+    localStorage.setItem(
+      "session",
+      JSON.stringify({ role: "admin" })
+    );
+
     location.href = "index.html";
     return;
   }
-  if (role === "student") {
-    const st = system
-      .getStudents()
-      .find((x) => x.studentId === u && x.password === p);
-    if (st) {
-      localStorage.setItem(
-        "session",
-        JSON.stringify({ role, studentId: st.studentId }),
-      );
-      location.href = "student.html";
-      return;
-    }
-  }
+
   $("login-error").classList.remove("hidden");
 }
-function setRole(role) {
-  window.loginRole = role;
-  $("tab-student").classList.toggle("active", role === "student");
-  $("tab-admin").classList.toggle("active", role === "admin");
-  $("username").placeholder =
-    role === "admin" ? "Admin username" : "Student ID";
-  $("signup-link").classList.toggle("hidden", role === "admin");
-}
-function toggleSignup() {
-  $("login-screen").classList.toggle("hidden");
-  $("signup-screen").classList.toggle("hidden");
-}
-function signup() {
-  let v = (id) => $(id).value.trim(),
-    s = {
-      studentId: v("su-id"),
-      first: v("su-first"),
-      middle: v("su-middle"),
-      last: v("su-last"),
-      department: v("su-dept"),
-      program: v("su-program"),
-      year: v("su-year"),
-      section: v("su-section"),
-      email: v("su-email"),
-      password: $("su-pass").value,
-    };
-  if (system.addStudent(s)) {
-    toast("Account created. Please sign in.");
-    toggleSignup();
-  }
-}
+
 class AttendanceSystem {
   events() {
     try {
@@ -120,56 +116,28 @@ class AttendanceSystem {
       return [];
     }
   }
+
   getEvents() {
     return this.events();
   }
+
   getEvent(id) {
-    return this.events().find((e) => e.id === Number(id)) || null;
+    return this.events().find(event => event.id === Number(id)) || null;
   }
-  save(es) {
+
+  save(events) {
     try {
-      localStorage.setItem("events", JSON.stringify(es));
+      localStorage.setItem("events", JSON.stringify(events));
       return true;
     } catch {
       alert(
-        "Browser storage is full. Use a smaller photo (under 1 MB) or clear older event data.",
+        "Browser storage is full. Use a smaller photo (under 1 MB) " +
+        "or clear older event data."
       );
       return false;
     }
   }
-  getStudents() {
-    try {
-      return JSON.parse(localStorage.getItem("students")) || [];
-    } catch {
-      return [];
-    }
-  }
-  addStudent(s) {
-    if (
-      !s.studentId ||
-      !s.first ||
-      !s.last ||
-      !s.program ||
-      !s.year ||
-      !s.section ||
-      !s.password
-    ) {
-      alert("Complete all required account fields.");
-      return false;
-    }
-    let a = this.getStudents();
-    if (a.some((x) => x.studentId === s.studentId)) {
-      alert("Student ID already exists.");
-      return false;
-    }
-    a.push(s);
-    localStorage.setItem("students", JSON.stringify(a));
-    return true;
-  }
-  currentStudent() {
-    let sid = getSession()?.studentId;
-    return this.getStudents().find((s) => s.studentId === sid) || null;
-  }
+
   addEvent(name, date, start, end, venue, grace = 15) {
     if (
       !name ||
@@ -179,11 +147,13 @@ class AttendanceSystem {
       !venue ||
       toMin(end) <= toMin(start)
     ) {
-      alert("Enter valid event details. End must be after start.");
+      alert("Enter valid event details. End time must be after start time.");
       return false;
     }
-    let a = this.events();
-    a.push({
+
+    const events = this.events();
+
+    events.push({
       id: Date.now(),
       name,
       date,
@@ -191,105 +161,141 @@ class AttendanceSystem {
       end,
       venue,
       grace: Number(grace) || 0,
-      attendees: [],
+      attendees: []
     });
-    return this.save(a);
+
+    return this.save(events);
   }
-  findConflict(sid, ev, events = this.events()) {
-    let a = eventDateTime(ev, ev.start),
-      b = eventDateTime(ev, ev.end);
-    return events.find(
-      (x) =>
-        x.id !== ev.id &&
-        x.date === ev.date &&
-        x.attendees?.some((y) => y.studentId === sid) &&
-        a < eventDateTime(x, x.end) &&
-        b > eventDateTime(x, x.start),
+
+  findConflict(studentId, currentEvent, events = this.events()) {
+    const currentStart = eventDateTime(currentEvent, currentEvent.start);
+    const currentEnd = eventDateTime(currentEvent, currentEvent.end);
+
+    return events.find(event =>
+      event.id !== currentEvent.id &&
+      event.date === currentEvent.date &&
+      event.attendees?.some(
+        attendee =>
+          attendee.studentId.toLowerCase() === studentId.toLowerCase()
+      ) &&
+      currentStart < eventDateTime(event, event.end) &&
+      currentEnd > eventDateTime(event, event.start)
     );
   }
-  canRegister(ev) {
-    let n = new Date();
-    return n >= eventDateTime(ev, ev.start) && n <= eventDateTime(ev, ev.end);
+
+  canRegister(event) {
+    const now = new Date();
+
+    return (
+      now >= eventDateTime(event, event.start) &&
+      now <= eventDateTime(event, event.end)
+    );
   }
-  registerSelf(id, proof) {
-    let st = this.currentStudent(),
-      all = this.events(),
-      ev = all.find((e) => e.id === Number(id));
-    if (!st || !ev) {
-      alert("Event or student account not found.");
+
+  registerStudent(eventId, student, proof) {
+    const events = this.events();
+    const event = events.find(item => item.id === Number(eventId));
+
+    if (!event) {
+      alert("Select a valid event.");
       return false;
     }
+
+    if (!this.canRegister(event)) {
+      alert(
+        `Student registration is available only during the event ` +
+        `(${fmt12(event.start)}–${fmt12(event.end)}).`
+      );
+      return false;
+    }
+
+    if (!student.studentId || !student.first || !student.last) {
+      alert("Student ID, first name, and last name are required.");
+      return false;
+    }
+
     if (!proof) {
-      alert("Upload a photo from the event as proof to register.");
+      alert("Upload an event photo as proof.");
       return false;
     }
-    if (!this.canRegister(ev)) {
+
+    const duplicate = event.attendees.some(
+      attendee =>
+        attendee.studentId.toLowerCase() === student.studentId.toLowerCase()
+    );
+
+    if (duplicate) {
+      alert("This student is already registered for this event.");
+      return false;
+    }
+
+    const conflict = this.findConflict(student.studentId, event, events);
+
+    if (conflict) {
       alert(
-        `Registration is open only during the event (${fmt12(ev.start)}–${fmt12(ev.end)}).`,
+        `Schedule conflict with ${conflict.name} ` +
+        `(${fmt12(conflict.start)}–${fmt12(conflict.end)}).`
       );
       return false;
     }
-    if (ev.attendees.some((a) => a.studentId === st.studentId)) {
-      alert("You are already registered.");
-      return false;
-    }
-    let clash = this.findConflict(st.studentId, ev, all);
-    if (clash) {
-      alert(
-        `Schedule conflict with ${clash.name} (${fmt12(clash.start)}–${fmt12(clash.end)}).`,
-      );
-      return false;
-    }
-    ev.attendees.push({
-      first: st.first,
-      middle: st.middle,
-      last: st.last,
-      course: st.program,
-      year: st.year,
-      section: st.section,
-      studentId: st.studentId,
+
+    event.attendees.push({
+      ...student,
       timeIn: new Date().toTimeString().slice(0, 5),
-      proof,
+      proof
     });
-    return this.save(all);
+
+    return this.save(events);
   }
-  unregisterSelf(id) {
-    let st = this.currentStudent(),
-      all = this.events(),
-      ev = all.find((e) => e.id === Number(id));
-    if (!st || !ev) return false;
-    ev.attendees = ev.attendees.filter((a) => a.studentId !== st.studentId);
-    return this.save(all);
-  }
-  attendeeStatus(ev, a) {
-    if (!a.timeIn)
-      return eventStatus(ev) === "Completed" ? "Absent" : "Registered";
-    return toMin(a.timeIn) <= toMin(ev.start) + Number(ev.grace || 0)
+
+  attendeeStatus(event, attendee) {
+    if (!attendee.timeIn) {
+      return eventStatus(event) === "Completed"
+        ? "Absent"
+        : "Registered";
+    }
+
+    return toMin(attendee.timeIn) <=
+      toMin(event.start) + Number(event.grace || 0)
       ? "Present"
       : "Late";
   }
-  summary(ev) {
-    let s = { Present: 0, Late: 0, Absent: 0, Registered: 0 };
-    ev.attendees.forEach((a) => s[this.attendeeStatus(ev, a)]++);
-    return s;
+
+  summary(event) {
+    const counts = {
+      Present: 0,
+      Late: 0,
+      Absent: 0,
+      Registered: 0
+    };
+
+    event.attendees.forEach(attendee => {
+      counts[this.attendeeStatus(event, attendee)]++;
+    });
+
+    return counts;
   }
-  setTimeIn(id, sid, time) {
-    let all = this.events(),
-      ev = all.find((e) => e.id === Number(id)),
-      a = ev?.attendees.find((x) => x.studentId === sid);
-    if (!a) return false;
-    a.timeIn = time;
-    return this.save(all);
+
+  deleteAttendee(eventId, studentId) {
+    const events = this.events();
+    const event = events.find(item => item.id === Number(eventId));
+
+    if (!event) return false;
+
+    event.attendees = event.attendees.filter(
+      attendee => attendee.studentId !== studentId
+    );
+
+    return this.save(events);
   }
-  deleteAttendee(id, sid) {
-    let all = this.events(),
-      ev = all.find((e) => e.id === Number(id));
-    if (!ev) return false;
-    ev.attendees = ev.attendees.filter((a) => a.studentId !== sid);
-    return this.save(all);
-  }
-  deleteEvent(id) {
-    return this.save(this.events().filter((e) => e.id !== Number(id)));
+
+  deleteEvent(eventId) {
+    const events = this.events().filter(
+      event => event.id !== Number(eventId)
+    );
+
+    return this.save(events);
   }
 }
+
 const system = new AttendanceSystem();
