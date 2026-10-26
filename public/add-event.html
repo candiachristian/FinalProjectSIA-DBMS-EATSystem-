@@ -1,0 +1,105 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Create event · Events</title>
+    <link rel="stylesheet" href="style.css" />
+    <script src="app.js"></script>
+  </head>
+
+  <body>
+    <header>
+      <div class="brand">
+        <span class="brand-mark">📝</span>
+        <h1>Events · Admin</h1>
+      </div>
+
+      <a href="index.html" style="color: white">Dashboard</a>
+    </header>
+
+    <main class="wrap narrow">
+      <section class="hero">
+        <h2>Create an event</h2>
+        <p>
+          Set a clear event window so students know when registration is open.
+        </p>
+      </section>
+
+      <section class="panel">
+        <form id="form">
+          <label>Event name *</label>
+          <input
+            id="name"
+            required
+            maxlength="100"
+            placeholder="e.g. Campus Sports Festival"/>
+          <div class="row">
+            <div>
+              <label>Date *</label><input id="date" type="date" required />
+            </div>
+
+            <div>
+              <label>Venue *</label
+              ><input id="venue" required placeholder="Building / room" />
+            </div>
+
+          </div>
+
+          <div class="row">
+            <div>
+              <label>Starts *</label><input id="start" type="time" required />
+            </div>
+
+            <div>
+              <label>Ends *</label><input id="end" type="time" required />
+            </div>
+
+          </div>
+          <label>On-time grace period (minutes)</label>
+          <input id="grace" type="number" min="0" max="180" value="15" />
+          <p class="hint">
+            Student registration and photo-proof submission are available only
+            during the event start-to-end window.
+          </p>
+
+          <div class="actions">
+            <button type="submit">Save event</button>
+            <a
+              class="button"
+              href="index.html"
+              style="background: #edf3fb; color: #284362; box-shadow: none"
+              >Cancel
+            </a>
+
+          </div>
+
+        </form>
+
+      </section>
+
+    </main>
+
+    <script>
+      requireRole("admin");
+      $("form").onsubmit = (e) => {
+        e.preventDefault();
+        if (
+          system.addEvent(
+            $("name").value.trim(),
+            $("date").value,
+            $("start").value,
+            $("end").value,
+            $("venue").value.trim(),
+            $("grace").value,
+          )
+        ) {
+          toast("Event created.");
+          setTimeout(() => (location.href = "show-events.html"), 650);
+        }
+      };
+    </script>
+
+  </body>
+
+</html>
