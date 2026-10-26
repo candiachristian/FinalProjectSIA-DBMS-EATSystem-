@@ -1,105 +1,63 @@
 <!doctype html>
 <html lang="en">
 <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width,initial-scale=1" />
-    <title>Sign in · Events</title>
-    <link rel="stylesheet" href="style.css" />
-    <script src="app.js"></script>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+
+  <title>Administrator Sign In · Events</title>
+
+  <link rel="stylesheet" href="style.css">
+  <script src="app.js"></script>
 </head>
 
 <body>
-    <main class="panel auth" id="login-screen">
-      <div class="brand">
-        <span class="brand-mark">📝</span><strong>Events</strong>
-      </div>
-      
-      <h2>Welcome back</h2>
-      <p class="hint">Sign in to manage or attend campus events.</p>
-      
-      <div class="tabs">
-        <button id="tab-student" class="active" onclick="setRole('student')">
-          Student</button>
-          <button id="tab-admin" class="secondary" onclick="setRole('admin')">
-          Administrator
-        </button>
-      </div>
-      
-      <label for="username">Student ID / username</label>
-      
+  <main class="panel auth">
+    <div class="brand">
+      <span class="brand-mark">📝</span>
+      <strong>NORSU · Events</strong>
+    </div>
+
+    <h2>Administrator sign in</h2>
+    <p class="hint">
+      Manage events and record student attendance.
+    </p>
+
+    <form id="login-form">
+      <label for="username">Admin username</label>
       <input
         id="username"
+        name="username"
+        type="text"
         autocomplete="username"
-        placeholder="Student ID"/>
-        <label for="password">Password</label>
-        <input
+        placeholder="Enter administrator username"
+        required
+      >
+
+      <label for="password">Password</label>
+      <input
         id="password"
+        name="password"
         type="password"
         autocomplete="current-password"
-        placeholder="Password"
-        onkeydown="if (event.key === 'Enter') login();"/>
-        
-        <button style="width: 100%; margin-top: 14px" onclick="login()">
+        placeholder="Enter administrator password"
+        required
+      >
+
+      <button type="submit" style="width: 100%; margin-top: 14px">
         Sign in
-        </button>
-      
-        <p id="login-error" class="notice error hidden">
-        Invalid username or password.
-        </p>
-      
-        <p id="signup-link" class="foot">
-        New student?
-        <a
-          href="#"
-          onclick="
-            toggleSignup();
-            return false;
-          "
-          >Create an account</a>
-        </p>
-    </main>
-    <main class="panel auth hidden" id="signup-screen">
-      <h2>Create student account</h2>
-      <p class="hint">Fields marked * are required.</p>
-      <label>Student ID *</label><input id="su-id" required />
-      
-      <div class="row">
-        <div><label>First name *</label><input id="su-first" /></div>
-        <div><label>Last name *</label><input id="su-last" /></div>
-      </div>
+      </button>
+    </form>
 
-      <label>Middle name</label><input id="su-middle" />
-      <label>Department</label>
-      <input id="su-dept" placeholder="e.g., College of Arts and Sciences" >
-      <label>Program *</label>
-      <input id="su-program" placeholder="e.g., BS Information Technology" />
+    <p id="login-error" class="notice error hidden">
+      Invalid administrator username or password.
+    </p>
+  </main>
 
-      <div class="row">
-        <div>
-          <label>Year level*</label
-          ><input id="su-year" placeholder="e.g., 1st Year" />
-        </div>
-
-        <div>
-          <label>Section *</label
-          ><input id="su-section" placeholder="e.g., A, B, C, D" />
-        </div>
-      </div>
-
-      <label>Email</label><input id="su-email" type="email" /><label
-        >Password *</label>
-        <input id="su-pass" type="password" />
-
-      <div class="actions">
-        <button onclick="signup()">Create account</button>
-        <button class="secondary" onclick="toggleSignup()">
-          Back to sign in
-        </button>
-      </div>
-      
-    </main>
-    <script>
-      setRole("student");
-    </script>
-  </body>
+  <script>
+    document.getElementById('login-form').addEventListener('submit', event => {
+      event.preventDefault();
+      login();
+    });
+  </script>
+</body>
 </html>
