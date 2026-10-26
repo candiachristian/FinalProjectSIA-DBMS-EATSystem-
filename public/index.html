@@ -1,63 +1,68 @@
 <!doctype html>
 <html lang="en">
-
 <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width,initial-scale=1" />
-    <title>Dashboard · Events</title>
-    <link rel="stylesheet" href="style.css" />
-    <script src="app.js"></script>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+
+  <title>Admin Dashboard · Events</title>
+
+  <link rel="stylesheet" href="style.css">
+  <script src="app.js"></script>
 </head>
 
 <body>
-    <header>
-      <div class="brand">
-        <span class="brand-mark">📝</span>
-        <h1>Events · Admin</h1>
-      </div>
+  <header>
+    <div class="brand">
+      <span class="brand-mark">📝</span>
+      <h1>Events · Admin</h1>
+    </div>
 
-      <button class="secondary" onclick="logout()">Log out</button>
-      
-    </header>
+    <button class="secondary" type="button" onclick="logout()">
+      Log out
+    </button>
+  </header>
 
-    <main class="wrap">
-      <section class="hero">
-        <h2>Events, made present.</h2>
+  <main class="wrap">
+    <section class="hero">
+      <h2>Events, made present.</h2>
+      <p>
+        Manage campus events, register students, and track attendance.
+      </p>
+    </section>
 
-        <p>Manage campus events and keep attendance in sync.</p>
-      </section>
+    <section class="cards" aria-label="Admin dashboard">
+      <a class="card" href="add-event.html">
+        <span class="icon" aria-hidden="true">＋</span>
+        <h3>Create an event</h3>
+        <p>Set the event date, schedule, venue, and grace period.</p>
+      </a>
 
-      <div class="cards">
-        <a class="card" href="add-event.html">
-            <span class="icon">＋</span>
-          <h3>Create an event</h3>
-          <p>Set date, schedule, venue and check-in grace period.</p>
-        </a>
-        
-        <a class="card" href="show-events.html"
-          ><span class="icon">▣</span>
-          <h3>Manage events</h3>
-          <p>Review, update, or remove your event listings.</p>
-        </a>
-        
-        <a class="card" href="attendance.html"
-          ><span class="icon">◉</span>
-          <h3>Attendance</h3>
-          <p>View rosters and manage student check-ins.</p>
-        </a>
-        
-        <a class="card" href="reports.html"
-          ><span class="icon">▤</span>
-          <h3>Reports</h3>
-          <p>Explore attendance summaries and print to PDF.</p>
-        </a>
-      </div>
+      <a class="card" href="show-events.html">
+        <span class="icon" aria-hidden="true">▣</span>
+        <h3>Manage events</h3>
+        <p>View or delete existing event listings.</p>
+      </a>
 
-      <p class="foot">Event Attendance Tracking System</p>
+      <a class="card" href="attendance.html">
+        <span class="icon" aria-hidden="true">◉</span>
+        <h3>Attendance &amp; student registration</h3>
+        <p>Select an active event, register students, and review photo proof.</p>
+      </a>
 
-    </main>
-    <script>
-      requireRole("admin");
-    </script>
-  </body>
+      <a class="card" href="reports.html">
+        <span class="icon" aria-hidden="true">▤</span>
+        <h3>Attendance reports</h3>
+        <p>Review event summaries and print or save reports as PDF.</p>
+      </a>
+    </section>
+
+    <p class="foot">
+      Event Attendance Tracking System
+    </p>
+  </main>
+
+  <script>
+    requireAdmin();
+  </script>
+</body>
 </html>
