@@ -63,3 +63,4 @@ CREATE TABLE registration (
     FOREIGN KEY (event_id) REFERENCES events(event_id),
     FOREIGN KEY (registration_status_id) REFERENCES registration_statuses(registration_status_id)
 );
+
