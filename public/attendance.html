@@ -1,0 +1,334 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Attendance</title>
+
+  <link rel="stylesheet" href="style.css">
+  <script src="app.js"></script>
+</head>
+
+<body>
+  <header>
+    <div class="brand">
+      <span class="brand-mark">📝</span>
+      <h1>Attendance &amp; student registration</h1>
+    </div>
+
+    <a href="index.html" style="color: white">Dashboard</a>
+  </header>
+
+  <main class="wrap">
+    <section class="panel">
+      <label for="event">Select event</label>
+
+      <select id="event" onchange="draw()">
+        <option value="">Choose an event…</option>
+      </select>
+
+      <div id="content"></div>
+    </section>
+  </main>
+
+  <script>
+    requireAdmin();
+
+    system.getEvents().forEach(event => {
+      $('event').insertAdjacentHTML(
+        'beforeend',
+        `<option value="${event.id}">
+          ${esc(event.name)} · ${esc(event.date)} · ${fmt12(event.start)}
+        </option>`
+      );
+    });
+
+    const eventFromUrl = new URLSearchParams(location.search).get('event');
+    if (eventFromUrl) {
+      $('event').value = eventFromUrl;
+    }
+
+    function draw() {
+      const event = system.getEvent($('event').value);
+
+      if (!event) {
+        $('content').innerHTML = '';
+        return;
+      }
+
+      const summary = system.summary(event);
+      const registrationOpen = system.canRegister(event);
+
+      $('content').innerHTML = `
+        <div class="stats">
+          ${Object.entries({
+            Registered: event.attendees.length,
+            ...summary
+          })
+            .map(([label, count]) => `
+              <div class="stat">
+                <b>${count}</b>
+                ${label}
+              </div>
+            `)
+            .join('')}
+        </div>
+
+        <section class="panel" style="margin: 12px 0; background: #f6f9ff">
+          <div class="title-row">
+            <div>
+              <h3>Register a student</h3>
+              <p class="hint">
+                Enter the student's details and attach photo proof.
+                Registration is allowed only while this event is in progress.
+              </p>
+            </div>
+
+            <span class="badge ${registrationOpen ? 'Ongoing' : eventStatus(event)}">
+              ${registrationOpen ? 'Registration open' : eventStatus(event)}
+            </span>
+          </div>
+
+          ${
+            registrationOpen
+              ? `
+                <form id="reg-form">
+                  <div class="row">
+                    <div>
+                      <label for="sid">Student ID *</label>
+                      <input
+                        id="sid"
+                        required
+                        placeholder="e.g., 2025-12345"
+                      >
+                    </div>
+
+                    <div>
+                      <label for="first">First name *</label>
+                      <input
+                        id="first"
+                        required
+                        placeholder="Student first name"
+                      >
+                    </div>
+
+                    <div>
+                      <label for="last">Last name *</label>
+                      <input
+                        id="last"
+                        required
+                        placeholder="Student last name"
+                      >
+                    </div>
+                  </div>
+
+                  <div class="row">
+                    <div>
+                      <label for="middle">Middle name</label>
+                      <input id="middle" placeholder="Optional">
+                    </div>
+
+                    <div>
+                      <label for="department">Department</label>
+                      <input
+                        id="department"
+                        placeholder="e.g., College of Arts and Sciences"
+                      >
+                    </div>
+
+                    <div>
+                      <label for="course">Program / course</label>
+                      <input
+                        id="course"
+                        placeholder="e.g., BS Information Technology"
+                      >
+                    </div>
+
+                    <div>
+                      <label for="section">Year &amp; section</label>
+                      <input
+                        id="section"
+                        placeholder="e.g., 2 - A"
+                      >
+                    </div>
+                  </div>
+
+                  <label for="proof">Photo proof from the event *</label>
+                  <input
+                    id="proof"
+                    type="file"
+                    accept="image/*"
+                    capture="environment"
+                    required
+                  >
+
+                  <p class="hint">
+                    Image file up to 1 MB. The photo is stored with this event registration.
+                  </p>
+
+                  <div class="actions">
+                    <button type="submit">
+                      Register student &amp; record time-in
+                    </button>
+                  </div>
+                </form>
+              `
+              : `
+                <div class="notice warn">
+                  Student registration opens at ${fmt12(event.start)}
+                  on ${esc(event.date)} and closes at ${fmt12(event.end)}.
+                  It is unavailable right now.
+                </div>
+              `
+          }
+        </section>
+
+        <h3>Registered students</h3>
+
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Student ID</th>
+                <th>Name</th>
+                <th>Department</th>
+                <th>Program / section</th>
+                <th>Time in</th>
+                <th>Proof</th>
+                <th>Status</th>
+                <th>Action</th>
+              </tr>
+            </thead>
+
+            <tbody>
+              ${
+                event.attendees.length
+                  ? event.attendees
+                      .map(student => `
+                        <tr>
+                          <td>${esc(student.studentId)}</td>
+                          <td>
+                            ${esc(student.first)}
+                            ${esc(student.middle || '')}
+                            ${esc(student.last)}
+                          </td>
+                          <td>${esc(student.department || '')}</td>
+                          <td>
+                            ${esc(student.course || '')}
+                            ${esc(student.section || '')}
+                          </td>
+                          <td>
+                            ${student.timeIn ? fmt12(student.timeIn) : '—'}
+                          </td>
+                          <td>
+                            ${
+                              student.proof
+                                ? `
+                                  <a
+                                    href="${student.proof}"
+                                    target="_blank"
+                                    rel="noopener"
+                                  >
+                                    <img
+                                      class="proof"
+                                      src="${student.proof}"
+                                      alt="Student event proof"
+                                    >
+                                  </a>
+                                `
+                                : '—'
+                            }
+                          </td>
+                          <td>
+                            <span class="badge ${system.attendeeStatus(event, student)}">
+                              ${system.attendeeStatus(event, student)}
+                            </span>
+                          </td>
+                          <td>
+                            <button
+                              class="danger"
+                              onclick="removeStudent('${esc(student.studentId)}')"
+                            >
+                              Remove
+                            </button>
+                          </td>
+                        </tr>
+                      `)
+                      .join('')
+                  : `
+                    <tr>
+                      <td colspan="8">No students registered yet.</td>
+                    </tr>
+                  `
+              }
+            </tbody>
+          </table>
+        </div>
+      `;
+
+      const form = $('reg-form');
+
+      if (form) {
+        form.onsubmit = handleRegistration;
+      }
+    }
+
+    async function handleRegistration(event) {
+      event.preventDefault();
+
+      const file = $('proof').files[0];
+
+      if (!file || !file.type.startsWith('image/') || file.size > 1024 * 1024) {
+        alert('Select a valid image up to 1 MB as required proof.');
+        return;
+      }
+
+      const proof = await new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result);
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+      });
+
+      const sectionValue = $('section').value.trim();
+      const sectionParts = sectionValue.split(/\s+-\s+/);
+
+      let year = '';
+      let section = '';
+
+      if (sectionParts.length > 1) {
+        year = sectionParts[0];
+        section = sectionParts.slice(1).join(' - ');
+      } else {
+        section = sectionParts[0] || '';
+      }
+
+      const student = {
+        studentId: $('sid').value.trim(),
+        first: $('first').value.trim(),
+        middle: $('middle').value.trim(),
+        last: $('last').value.trim(),
+        department: $('department').value.trim(),
+        course: $('course').value.trim(),
+        year,
+        section
+      };
+
+      if (system.registerStudent($('event').value, student, proof)) {
+        toast('Student registered and time-in recorded.');
+        draw();
+      }
+    }
+
+    function removeStudent(studentId) {
+      if (confirm('Remove this student from the event?')) {
+        system.deleteAttendee($('event').value, studentId);
+        draw();
+      }
+    }
+
+    draw();
+    //(draw, 15000);
+  </script>
+</body>
+</html>
