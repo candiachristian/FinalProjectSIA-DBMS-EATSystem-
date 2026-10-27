@@ -16,6 +16,11 @@ CREATE TABLE event_categories (
     category_name VARCHAR(80) NOT NULL UNIQUE
 );
 
+CREATE TABLE event_statuses (
+    status_id INT AUTO_INCREMENT PRIMARY KEY,
+    status_name VARCHAR(40) NOT NULL UNIQUE
+);
+
 CREATE TABLE registration_statuses (
     status_id INT AUTO_INCREMENT PRIMARY KEY,
     status_name VARCHAR(40) NOT NULL UNIQUE
@@ -93,3 +98,4 @@ CREATE TABLE events (
     FOREIGN KEY (term_id) REFERENCES academic_terms(term_id),
     FOREIGN KEY (created_by) REFERENCES users(user_id)
 );
+
