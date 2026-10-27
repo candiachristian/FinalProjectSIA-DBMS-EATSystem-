@@ -30,6 +30,17 @@ CREATE TABLE programs (
     FOREIGN KEY (department_id) REFERENCES departments(department_id)
 );
 
+CREATE TABLE attendance_statuses (
+    status_id INT AUTO_INCREMENT PRIMARY KEY,
+    status_name VARCHAR(40) NOT NULL UNIQUE
+);
+
+CREATE TABLE venues (
+    venue_id INT AUTO_INCREMENT PRIMARY KEY,
+    venue_name VARCHAR(120) NOT NULL,
+    location VARCHAR(150) NULL
+);
+
 CREATE TABLE users (
     user_id INT AUTO_INCREMENT PRIMARY KEY,
     username VARCHAR(80) NOT NULL UNIQUE,
