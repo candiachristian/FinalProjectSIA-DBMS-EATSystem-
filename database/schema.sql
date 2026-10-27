@@ -75,3 +75,21 @@ CREATE TABLE registration (
     FOREIGN KEY (registration_status_id) REFERENCES registration_statuses(registration_status_id)
 );
 
+CREATE TABLE events (
+    event_id INT AUTO_INCREMENT PRIMARY KEY,
+    event_name VARCHAR(150) NOT NULL,
+    event_date DATE NOT NULL,
+    start_time TIME NOT NULL,
+    end_time TIME NOT NULL,
+    grace_period_minutes INT NOT NULL DEFAULT 15,
+    venue_id INT NOT NULL,
+    category_id INT NOT NULL,
+    status_id INT NOT NULL,
+    term_id INT NULL,
+    created_by INT NOT NULL,
+    FOREIGN KEY (venue_id) REFERENCES venues(venue_id),
+    FOREIGN KEY (category_id) REFERENCES event_categories(category_id),
+    FOREIGN KEY (status_id) REFERENCES event_statuses(status_id),
+    FOREIGN KEY (term_id) REFERENCES academic_terms(term_id),
+    FOREIGN KEY (created_by) REFERENCES users(user_id)
+);
