@@ -1,107 +1,161 @@
 <?php
-$envPath = dirname(__DIR__) . '/.env';
+declare(strict_types=1);
 
-if (!is_readable($envPath)) {
-    exit('Could not find the project .env file.');
+require_once __DIR__ . '/dbconfig.php';
+
+if (!isset($connection) || !($connection instanceof mysqli)) {
+    http_response_code(500);
+    exit('Database connection is not available. Check php/dbconfig.php.');
 }
 
-$settings = [];
+$connection->set_charset('utf8mb4');
 
-foreach (file($envPath, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES) as $line) {
-    $line = trim($line);
+$columns = [
+    'student_number',
+    'first_name',
+    'last_name',
+    'program_name',
+    'department_name'
+];
 
-    if ($line === '' || str_starts_with($line, '#')) {
-        continue;
-    }
+$reports = [
+    'INNER JOIN — students with a program and department' => <<<'SQL'
+        SELECT
+            s.student_number,
+            s.first_name,
+            s.last_name,
+            p.program_name,
+            d.department_name
+        FROM students AS s
+        INNER JOIN programs AS p
+            ON p.program_id = s.program_id
+        INNER JOIN departments AS d
+            ON d.department_id = p.department_id
+        ORDER BY s.student_number
+        SQL,
 
-    $separator = strpos($line, '=');
-    if ($separator === false) {
-        continue;
-    }
+    'LEFT JOIN — keep every student' => <<<'SQL'
+        SELECT
+            s.student_number,
+            s.first_name,
+            s.last_name,
+            p.program_name,
+            d.department_name
+        FROM students AS s
+        LEFT JOIN programs AS p
+            ON p.program_id = s.program_id
+        LEFT JOIN departments AS d
+            ON d.department_id = p.department_id
+        ORDER BY s.student_number
+        SQL,
 
-    $key = trim(substr($line, 0, $separator));
-    $value = trim(substr($line, $separator + 1));
-    $settings[$key] = trim($value, "\"'");
+    'RIGHT JOIN — keep every program' => <<<'SQL'
+        SELECT
+            s.student_number,
+            s.first_name,
+            s.last_name,
+            p.program_name,
+            d.department_name
+        FROM students AS s
+        RIGHT JOIN programs AS p
+            ON p.program_id = s.program_id
+        LEFT JOIN departments AS d
+            ON d.department_id = p.department_id
+        ORDER BY p.program_name, s.student_number
+        SQL,
+
+    'FULL OUTER JOIN equivalent — students, programs, and departments' => <<<'SQL'
+        SELECT
+            s.student_number,
+            s.first_name,
+            s.last_name,
+            p.program_name,
+            d.department_name
+        FROM students AS s
+        LEFT JOIN programs AS p
+            ON p.program_id = s.program_id
+        LEFT JOIN departments AS d
+            ON d.department_id = p.department_id
+
+        UNION
+
+        SELECT
+            s.student_number,
+            s.first_name,
+            s.last_name,
+            p.program_name,
+            d.department_name
+        FROM programs AS p
+        LEFT JOIN students AS s
+            ON s.program_id = p.program_id
+        LEFT JOIN departments AS d
+            ON d.department_id = p.department_id
+
+        UNION
+
+        SELECT
+            s.student_number,
+            s.first_name,
+            s.last_name,
+            p.program_name,
+            d.department_name
+        FROM departments AS d
+        LEFT JOIN programs AS p
+            ON p.department_id = d.department_id
+        LEFT JOIN students AS s
+            ON s.program_id = p.program_id
+
+        ORDER BY student_number
+        SQL
+];
+
+function escapeCell($value): string
+{
+    return htmlspecialchars(
+        (string) ($value ?? ''),
+        ENT_QUOTES | ENT_SUBSTITUTE,
+        'UTF-8'
+    );
 }
 
-mysqli_report(MYSQLI_REPORT_ERROR | MYSQLI_REPORT_STRICT);
+$results = [];
 
 try {
-    $connection = new mysqli(
-        $settings['DB_HOST'] ?? 'localhost',
-        $settings['DB_USER'] ?? 'root',
-        $settings['DB_PASSWORD'] ?? '',
-        $settings['DB_NAME'] ?? 'event_attendance_db',
-        (int) ($settings['DB_PORT'] ?? 3306)
-    );
-
-    $connection->set_charset('utf8mb4');
-
-    $sql = "
-        SELECT
-            students.student_number,
-            students.first_name,
-            students.middle_name,
-            students.last_name,
-            students.email,
-            students.year_level,
-            students.section,
-            programs.program_name,
-            programs.department,
-            users.username,
-            roles.role_name
-        FROM students
-        INNER JOIN users
-            ON students.user_id = users.user_id
-        INNER JOIN roles
-            ON users.role_id = roles.role_id
-        INNER JOIN programs
-            ON students.program_id = programs.program_id
-        ORDER BY students.last_name, students.first_name
-    ";
-
-    $result = $connection->query($sql);
-} catch (Throwable $error) {
+    foreach ($reports as $title => $sql) {
+        $results[$title] = $connection->query($sql);
+    }
+} catch (mysqli_sql_exception $error) {
+    error_log('DBMS report query failed: ' . $error->getMessage());
     http_response_code(500);
-    exit('Could not load the report. Check the database connection and table setup.');
-}
-
-function escapeHtml($value): string
-{
-    return htmlspecialchars((string) $value, ENT_QUOTES, 'UTF-8');
+    exit(
+        'A report query failed. Check that the database tables and column names ' .
+        'match the approved schema.'
+    );
 }
 ?>
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Student Accounts Report</title>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Event Attendance — Join Reports</title>
     <style>
         body {
             font-family: Arial, sans-serif;
-            margin: 30px;
-            color: #222;
-        }
-
-        h1, p {
-            margin-bottom: 10px;
-        }
-
-        button {
-            padding: 10px 16px;
-            margin: 10px 0 18px;
-            cursor: pointer;
+            max-width: 1000px;
+            margin: 2rem auto;
+            padding: 0 1rem;
         }
 
         table {
-            width: 100%;
             border-collapse: collapse;
+            width: 100%;
+            margin: 1rem 0 2rem;
         }
 
         th, td {
-            border: 1px solid #999;
-            padding: 8px;
+            border: 1px solid #bbb;
+            padding: .5rem;
             text-align: left;
         }
 
@@ -115,58 +169,47 @@ function escapeHtml($value): string
             }
 
             body {
-                margin: 10mm;
+                margin: 0;
+                max-width: none;
             }
         }
     </style>
 </head>
 <body>
-    <h1>Student Accounts Report</h1>
-    <p>Report includes student, program, account, and role details.</p>
-    <button type="button" onclick="window.print()">Print report</button>
+    <h1>Students by Program and Department</h1>
+    <button type="button" onclick="window.print()">Print reports</button>
 
-    <?php if ($result->num_rows === 0): ?>
-        <p>No student records found. Add sample data before demonstrating the report.</p>
-    <?php else: ?>
-        <table>
-            <thead>
-                <tr>
-                    <th>Student Number</th>
-                    <th>Student Name</th>
-                    <th>Email</th>
-                    <th>Program</th>
-                    <th>Department</th>
-                    <th>Year</th>
-                    <th>Section</th>
-                    <th>Username</th>
-                    <th>Role</th>
-                </tr>
-            </thead>
-            <tbody>
-                <?php while ($row = $result->fetch_assoc()): ?>
+    <?php foreach ($results as $title => $result): ?>
+        <section>
+            <h2><?= escapeCell($title) ?></h2>
+            <table>
+                <thead>
                     <tr>
-                        <td><?= escapeHtml($row['student_number']) ?></td>
-                        <td>
-                            <?= escapeHtml($row['first_name']) ?>
-                            <?= escapeHtml($row['middle_name']) ?>
-                            <?= escapeHtml($row['last_name']) ?>
-                        </td>
-                        <td><?= escapeHtml($row['email']) ?></td>
-                        <td><?= escapeHtml($row['program_name']) ?></td>
-                        <td><?= escapeHtml($row['department']) ?></td>
-                        <td><?= escapeHtml($row['year_level']) ?></td>
-                        <td><?= escapeHtml($row['section']) ?></td>
-                        <td><?= escapeHtml($row['username']) ?></td>
-                        <td><?= escapeHtml($row['role_name']) ?></td>
+                        <th>Student number</th>
+                        <th>First name</th>
+                        <th>Last name</th>
+                        <th>Program</th>
+                        <th>Department</th>
                     </tr>
-                <?php endwhile; ?>
-            </tbody>
-        </table>
-    <?php endif; ?>
-
-    <?php
-    $result->free();
-    $connection->close();
-    ?>
+                </thead>
+                <tbody>
+                    <?php while ($row = $result->fetch_assoc()): ?>
+                        <tr>
+                            <?php foreach ($columns as $column): ?>
+                                <td><?= escapeCell($row[$column] ?? '') ?></td>
+                            <?php endforeach; ?>
+                        </tr>
+                    <?php endwhile; ?>
+                </tbody>
+            </table>
+        </section>
+    <?php endforeach; ?>
 </body>
 </html>
+<?php
+foreach ($results as $result) {
+    $result->free();
+}
+
+$connection->close();
+?>
