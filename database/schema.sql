@@ -26,6 +26,11 @@ CREATE TABLE registration_statuses (
     status_name VARCHAR(40) NOT NULL UNIQUE
 );
 
+CREATE TABLE attendance_statuses (
+    status_id INT AUTO_INCREMENT PRIMARY KEY,
+    status_name VARCHAR(40) NOT NULL UNIQUE
+);
+
 CREATE TABLE venues (
     venue_id INT AUTO_INCREMENT PRIMARY KEY,
     venue_name VARCHAR(120) NOT NULL,
@@ -85,6 +90,20 @@ CREATE TABLE events (
     FOREIGN KEY (created_by) REFERENCES users(user_id)
 );
 
+CREATE TABLE registration (
+    registration_id INT AUTO_INCREMENT PRIMARY KEY,
+    student_id INT NOT NULL,
+    event_id INT NOT NULL,
+    status_id INT NOT NULL,
+    registered_by INT NOT NULL,
+    registered_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE (student_id, event_id),
+    FOREIGN KEY (student_id) REFERENCES students(student_id),
+    FOREIGN KEY (event_id) REFERENCES events(event_id),
+    FOREIGN KEY (status_id) REFERENCES registration_statuses(status_id),
+    FOREIGN KEY (registered_by) REFERENCES users(user_id)
+);
+
 CREATE TABLE attendance (
     attendance_id INT AUTO_INCREMENT PRIMARY KEY,
     registration_id INT NOT NULL UNIQUE,
@@ -112,18 +131,4 @@ CREATE TABLE attendance_notes (
     added_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (attendance_id) REFERENCES attendance(attendance_id),
     FOREIGN KEY (added_by) REFERENCES users(user_id)
-
-CREATE TABLE registration (
-    registration_id INT AUTO_INCREMENT PRIMARY KEY,
-    student_id INT NOT NULL,
-    event_id INT NOT NULL,
-    status_id INT NOT NULL,
-    registered_by INT NOT NULL,
-    registered_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    UNIQUE (student_id, event_id),
-    FOREIGN KEY (student_id) REFERENCES students(student_id),
-    FOREIGN KEY (event_id) REFERENCES events(event_id),
-    FOREIGN KEY (status_id) REFERENCES registration_statuses(status_id),
-    FOREIGN KEY (registered_by) REFERENCES users(user_id)
 );
-
