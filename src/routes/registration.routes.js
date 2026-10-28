@@ -1,12 +1,14 @@
+'use strict';
 const express = require('express');
-const registrationController = require('../controllers/registration.controller');
-
 const router = express.Router();
+const controller = require('../controllers/registration.controller');
 
-router.get('/', registrationController.getRegistrations);
-router.get('/:id', registrationController.getRegistration);
-router.post('/', registrationController.createRegistration);
-router.put('/:id', registrationController.updateRegistration);
-router.delete('/:id',registrationController.deleteRegistration);
+router.get('/lookup/students', controller.lookupStudents);
+router.get('/lookup/events', controller.lookupEvents);
+
+router.get('/', controller.list);
+router.post('/', controller.create);
+router.put('/:id/status', controller.updateStatus);
+router.delete('/:id', controller.remove);
 
 module.exports = router;

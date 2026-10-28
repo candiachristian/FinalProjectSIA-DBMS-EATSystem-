@@ -50,7 +50,7 @@ async function remove(statusId) {
     return result.affectedRows;
 }
 
-module.exports = { 
+module.exports = {
     PROTECTED_NAMES,
     listAll,
     getById,
