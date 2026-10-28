@@ -61,7 +61,7 @@ VALUES ('First Semester 2026-2027');
 INSERT IGNORE INTO users (username, password_hash, role_id)
 SELECT
     'admin',
-    'event-attendance-demo-salt:6b7c72790d91d38a567180eeb88c5087206d4eb802f867a7ecaf52ac08a18717c8c4fcd58832a3393f2560e9b9bb9f431a09282dc2bbf08158ccc5be1e625002',
+    '$2b$10$n1prwxQ/JJCP0F2ehYuH/uFRHKkaMznuggJDAh3O7BZSd9Kx3VF/m',
     role_id
 FROM roles
 WHERE role_name = 'admin';
