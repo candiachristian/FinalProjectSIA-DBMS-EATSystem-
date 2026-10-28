@@ -22,5 +22,5 @@ app.get('/api/health', (req, res) => {
 app.use('/api/auth', authRoutes);
 
 app.listen(PORT, () => {
-    console.log('Server running at http://localhost:${PORT}');
+    console.log(`Server running at http://localhost:${PORT}`);
 });
