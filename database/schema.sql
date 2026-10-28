@@ -85,6 +85,33 @@ CREATE TABLE events (
     FOREIGN KEY (created_by) REFERENCES users(user_id)
 );
 
+CREATE TABLE attendance (
+    attendance_id INT AUTO_INCREMENT PRIMARY KEY,
+    registration_id INT NOT NULL UNIQUE,
+    status_id INT NOT NULL,
+    time_in DATETIME NULL,
+    recorded_by INT NULL,
+    FOREIGN KEY (registration_id) REFERENCES registration(registration_id),
+    FOREIGN KEY (status_id) REFERENCES attendance_statuses(status_id),
+    FOREIGN KEY (recorded_by) REFERENCES users(user_id)
+);
+
+CREATE TABLE event_programs (
+    event_id INT NOT NULL,
+    program_id INT NOT NULL,
+    PRIMARY KEY (event_id, program_id),
+    FOREIGN KEY (event_id) REFERENCES events(event_id),
+    FOREIGN KEY (program_id) REFERENCES programs(program_id)
+);
+
+CREATE TABLE attendance_notes (
+    note_id INT AUTO_INCREMENT PRIMARY KEY,
+    attendance_id INT NOT NULL,
+    note_text VARCHAR(255) NOT NULL,
+    added_by INT NOT NULL,
+    added_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (attendance_id) REFERENCES attendance(attendance_id),
+    FOREIGN KEY (added_by) REFERENCES users(user_id)
 
 CREATE TABLE registration (
     registration_id INT AUTO_INCREMENT PRIMARY KEY,
