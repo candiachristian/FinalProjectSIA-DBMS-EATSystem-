@@ -59,7 +59,7 @@ CREATE TABLE students (
     student_number VARCHAR(40) NOT NULL UNIQUE,
     first_name VARCHAR(80) NOT NULL,
     last_name VARCHAR(80) NOT NULL,
-    program_id INT NOT NULL,
+    program_id INT NULL,
     year_level TINYINT NOT NULL,
     section VARCHAR(20) NOT NULL,
     email VARCHAR(254) NULL,
