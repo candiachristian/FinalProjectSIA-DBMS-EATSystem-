@@ -6,6 +6,7 @@ const authRoutes = require('./src/routes/auth.routes');
 const registrationRoutes = require('./src/routes/registration.routes');
 const registrationStatusRoutes = require('./src/routes/registrationStatus.routes');
 const attendanceRoutes = require('./src/routes/attendance.routes');
+const studentRoutes = require('./src/routes/student.routes');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -17,6 +18,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/registrations', registrationRoutes);
 app.use('/api/registration-statuses', registrationStatusRoutes);
 app.use('/api/attendance', attendanceRoutes);
+app.use('/api/students', studentRoutes);
 
 app.use(express.static(path.join(__dirname, 'public')));
 
