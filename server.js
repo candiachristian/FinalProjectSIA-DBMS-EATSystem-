@@ -3,12 +3,20 @@ require('dotenv').config();
 const express = require('express');
 const path = require('path');
 const authRoutes = require('./src/routes/auth.routes');
+const registrationRoutes = require('./src/routes/registration.routes');
+const registrationStatusRoutes = require('./src/routes/registrationStatus.routes');
+const attendanceRoutes = require('./src/routes/attendance.routes');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
 app.use(express.json());
+
+
 app.use('/api/auth', authRoutes);
+app.use('/api/registrations', registrationRoutes);
+app.use('/api/registration-statuses', registrationStatusRoutes);
+app.use('/api/attendance', attendanceRoutes);
 
 app.use(express.static(path.join(__dirname, 'public')));
 
@@ -18,8 +26,6 @@ app.get('/api/health', (req, res) => {
     message: 'Event Attendance Tracking System server is running'
   });
 });
-
-app.use('/api/auth', authRoutes);
 
 app.listen(PORT, () => {
     console.log(`Server running at http://localhost:${PORT}`);
