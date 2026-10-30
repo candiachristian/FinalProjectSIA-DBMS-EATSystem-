@@ -32,6 +32,7 @@ async function getEventAttendance(eventId) {
                 a.attendance_id,
                 s.student_id, s.student_number, s.first_name, s.last_name,
                 s.year_level, s.section,
+                p.program_name, d.department_name,
                 e.event_id, e.event_name,
                 DATE_FORMAT(e.event_date, '%Y-%m-%d') AS event_date,
                 TIME_FORMAT(e.start_time, '%H:%i') AS start_time,
@@ -43,9 +44,11 @@ async function getEventAttendance(eventId) {
           INNER JOIN students s ON s.student_id = r.student_id
           INNER JOIN events e ON e.event_id = r.event_id
           INNER JOIN registration_statuses rs ON rs.status_id = r.status_id
-           LEFT JOIN attendance a ON a.registration_id = r.registration_id
-           LEFT JOIN attendance_statuses ast ON ast.status_id = a.status_id
-           LEFT JOIN users u ON u.user_id = a.recorded_by
+          LEFT JOIN programs p ON p.program_id = s.program_id
+          LEFT JOIN departments d ON d.department_id = p.department_id
+          LEFT JOIN attendance a ON a.registration_id = r.registration_id
+          LEFT JOIN attendance_statuses ast ON ast.status_id = a.status_id
+          LEFT JOIN users u ON u.user_id = a.recorded_by
           WHERE r.event_id = ?
             AND (rs.status_name = 'Registered' OR a.attendance_id IS NOT NULL)
           ORDER BY s.last_name, s.first_name`,

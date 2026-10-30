@@ -300,3 +300,6 @@ WHERE s.student_number = '202521051'
       WHERE n.attendance_id = a.attendance_id
         AND n.note_text = 'Sample record for testing the attendance notes feature'
   );
+
+UPDATE events SET event_date = CURDATE(), start_time = '00:00:00', end_time = '23:59:00'
+WHERE event_name = 'IT Orientation';
