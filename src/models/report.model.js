@@ -16,10 +16,9 @@ async function getAttendanceReport(eventId = null) {
       d.department_name,
       s.year_level,
       s.section,
-      ast.status_name AS attendance_status,
-      a.check_in_time
+      ast.status_name AS attendance_status
     FROM attendance AS a
-    INNER JOIN registrations AS r
+    INNER JOIN registration AS r
       ON r.registration_id = a.registration_id
     INNER JOIN students AS s
       ON s.student_id = r.student_id
@@ -30,7 +29,7 @@ async function getAttendanceReport(eventId = null) {
     LEFT JOIN departments AS d
       ON d.department_id = p.department_id
     LEFT JOIN attendance_statuses AS ast
-      ON ast.attendance_status_id = a.attendance_status_id
+      ON ast.status_id = a.status_id
   `;
 
   const params = [];
