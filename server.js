@@ -7,7 +7,7 @@ const registrationRoutes = require('./src/routes/registration.routes');
 const registrationStatusRoutes = require('./src/routes/registrationStatus.routes');
 const attendanceRoutes = require('./src/routes/attendance.routes');
 const studentRoutes = require('./src/routes/student.routes');
-
+const reportRoutes = require('./src/routes/report.routes');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
@@ -21,6 +21,7 @@ app.use('/api/attendance', attendanceRoutes);
 app.use('/api/students', studentRoutes);
 
 app.use(express.static(path.join(__dirname, 'public')));
+app.use('/api/reports', reportRoutes);
 
 app.get('/api/health', (req, res) => {
   res.status(200).json({
