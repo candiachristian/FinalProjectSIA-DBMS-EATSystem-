@@ -313,4 +313,35 @@ class AttendanceSystem {
   }
 }
 
+const eatApi = (() => {
+  async function request(url, options = {}) {
+    const res = await authFetch(url, { ...options, headers: { 'Content-Type': 'application/json' } });
+    const body = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(body.message || 'Request failed');
+    return body.data !== undefined ? body.data : body;
+  }
+  const send = (method, url, payload) => request(url, { method, body: JSON.stringify(payload || {}) });
+
+  return {
+    events: () => request('/api/registrations/lookup/events'),
+    roster: (eventId) => request('/api/attendance?eventId=' + encodeURIComponent(eventId)),
+
+    findStudentByNumber: async (number) => {
+      const list = await request('/api/registrations/lookup/students?search=' + encodeURIComponent(number));
+      return list.find((s) => s.student_number === number) || null;
+    },
+
+    register: (studentId, eventId) => send('POST', '/api/registrations', { studentId, eventId }),
+    removeRegistration: (registrationId) => request('/api/registrations/' + registrationId, { method: 'DELETE' }),
+
+    setRegistrationStatus: (registrationId, status) =>
+      send('PUT', '/api/registrations/' + registrationId + '/status', { status }),
+    registrationStatuses: () => request('/api/registration-statuses'),
+
+    recordAttendance: (registrationId, status) =>
+      send('POST', '/api/attendance', status ? { registrationId, status } : { registrationId }),
+    editAttendance: (attendanceId, payload) => send('PUT', '/api/attendance/' + attendanceId, payload),
+  };
+})();
+
 const system = new AttendanceSystem();
