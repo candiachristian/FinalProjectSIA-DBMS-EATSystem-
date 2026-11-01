@@ -9,12 +9,12 @@ const attendanceRoutes = require('./src/routes/attendance.routes');
 const studentRoutes = require('./src/routes/student.routes');
 const reportRoutes = require('./src/routes/report.routes');
 const eventRoutes = require('./src/routes/event.routes');
+const eventCategoryRoutes = require('./src/routes/eventCategory.routes');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
 app.use(express.json());
-
 
 app.use('/api/auth', authRoutes);
 app.use('/api/registrations', registrationRoutes);
@@ -23,6 +23,7 @@ app.use('/api/attendance', attendanceRoutes);
 app.use('/api/students', studentRoutes);
 app.use('/api/reports', reportRoutes);
 app.use('/api/events', eventRoutes);
+app.use('/api/event-categories', eventCategoryRoutes);
 
 app.use(express.static(path.join(__dirname, 'public')));
 
