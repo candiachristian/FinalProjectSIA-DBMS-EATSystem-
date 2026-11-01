@@ -1,8 +1,3 @@
-const ADMIN = {
-  username: "admin",
-  password: "admin123"
-};
-
 const $ = id => document.getElementById(id);
 
 const esc = value =>
@@ -61,17 +56,57 @@ function toast(message) {
   }, 3300);
 }
 
-function getSession() {
+const TOKEN_KEY = "authToken";
+
+function parseToken(token) {
   try {
-    return JSON.parse(localStorage.getItem("session"));
+    const base64 = token.split(".")[1].replace(/-/g, "+").replace(/_/g, "/");
+    return JSON.parse(atob(base64));
   } catch {
     return null;
   }
 }
 
+function getToken() {
+  return localStorage.getItem(TOKEN_KEY);
+}
+
+function getSession() {
+  const token = getToken();
+  const payload = token ? parseToken(token) : null;
+
+  if (!payload || (payload.exp && payload.exp * 1000 < Date.now())) {
+    localStorage.removeItem(TOKEN_KEY);
+    return null;
+  }
+
+  return {
+    userId: Number(payload.sub),
+    username: payload.username,
+    role: payload.role
+  };
+}
+
 function logout() {
+  localStorage.removeItem(TOKEN_KEY);
   localStorage.removeItem("session");
   location.href = "log-in.html";
+}
+
+async function authFetch(url, options = {}) {
+  const response = await fetch(url, {
+    ...options,
+    headers: {
+      ...(options.headers || {}),
+      Authorization: `Bearer ${getToken()}`
+    }
+  });
+
+  if (response.status === 401 || response.status === 403) {
+    logout();
+  }
+
+  return response;
 }
 
 function requireAdmin() {
@@ -80,31 +115,12 @@ function requireAdmin() {
     return false;
   }
 
+  authFetch("/api/auth/me").catch(() => {});
   return true;
 }
 
 function requireRole(role) {
   return role === "admin" ? requireAdmin() : false;
-}
-
-function login() {
-  const username = $("username").value.trim();
-  const password = $("password").value;
-
-  if (
-    username === ADMIN.username &&
-    password === ADMIN.password
-  ) {
-    localStorage.setItem(
-      "session",
-      JSON.stringify({ role: "admin" })
-    );
-
-    location.href = "index.html";
-    return;
-  }
-
-  $("login-error").classList.remove("hidden");
 }
 
 class AttendanceSystem {
@@ -296,5 +312,36 @@ class AttendanceSystem {
     return this.save(events);
   }
 }
+
+const eatApi = (() => {
+  async function request(url, options = {}) {
+    const res = await authFetch(url, { ...options, headers: { 'Content-Type': 'application/json' } });
+    const body = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(body.message || 'Request failed');
+    return body.data !== undefined ? body.data : body;
+  }
+  const send = (method, url, payload) => request(url, { method, body: JSON.stringify(payload || {}) });
+
+  return {
+    events: () => request('/api/registrations/lookup/events'),
+    roster: (eventId) => request('/api/attendance?eventId=' + encodeURIComponent(eventId)),
+
+    findStudentByNumber: async (number) => {
+      const list = await request('/api/registrations/lookup/students?search=' + encodeURIComponent(number));
+      return list.find((s) => s.student_number === number) || null;
+    },
+
+    register: (studentId, eventId) => send('POST', '/api/registrations', { studentId, eventId }),
+    removeRegistration: (registrationId) => request('/api/registrations/' + registrationId, { method: 'DELETE' }),
+
+    setRegistrationStatus: (registrationId, status) =>
+      send('PUT', '/api/registrations/' + registrationId + '/status', { status }),
+    registrationStatuses: () => request('/api/registration-statuses'),
+
+    recordAttendance: (registrationId, status) =>
+      send('POST', '/api/attendance', status ? { registrationId, status } : { registrationId }),
+    editAttendance: (attendanceId, payload) => send('PUT', '/api/attendance/' + attendanceId, payload),
+  };
+})();
 
 const system = new AttendanceSystem();
