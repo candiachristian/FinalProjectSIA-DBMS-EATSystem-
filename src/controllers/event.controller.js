@@ -19,7 +19,6 @@ function validateEvent(body) {
     'eventDate',
     'startTime',
     'endTime',
-    'venue',
     'categoryId'
   ];
 
@@ -33,7 +32,10 @@ function validateEvent(body) {
     return 'eventDate must use YYYY-MM-DD format.';
   }
 
-  if (!isValidTime(String(body.startTime)) || !isValidTime(String(body.endTime))) {
+  if (
+    !isValidTime(String(body.startTime)) ||
+    !isValidTime(String(body.endTime))
+  ) {
     return 'startTime and endTime must use HH:MM or HH:MM:SS format.';
   }
 
@@ -41,19 +43,36 @@ function validateEvent(body) {
     return 'categoryId must be a valid positive number.';
   }
 
+  if (
+    body.gracePeriodMinutes !== undefined &&
+    (!Number.isInteger(Number(body.gracePeriodMinutes)) ||
+      Number(body.gracePeriodMinutes) < 0 ||
+      Number(body.gracePeriodMinutes) > 180)
+  ) {
+    return 'gracePeriodMinutes must be a whole number from 0 to 180.';
+  }
+
   return null;
 }
 
-function sendDatabaseError(error, res) {
-  if (error.code === 'ER_NO_REFERENCED_ROW_2') {
+function handleDatabaseError(error, res) {
+  if (error.code === 'VENUE_NOT_FOUND') {
     return res.status(400).json({
       success: false,
-      message: 'The selected event category does not exist.',
+      message: error.message,
       data: null
     });
   }
 
-  console.error(error);
+  if (error.code === 'ER_NO_REFERENCED_ROW_2') {
+    return res.status(400).json({
+      success: false,
+      message: 'A selected category, venue, status, term, or creator does not exist.',
+      data: null
+    });
+  }
+
+  console.error('Event API error:', error);
 
   return res.status(500).json({
     success: false,
@@ -64,9 +83,7 @@ function sendDatabaseError(error, res) {
 
 async function getEvents(req, res) {
   try {
-    const search = String(req.query.search || '').trim();
-    const categoryId = req.query.categoryId;
-    const date = req.query.date;
+    const { search = '', categoryId, date } = req.query;
 
     if (categoryId && !isPositiveInteger(categoryId)) {
       return res.status(400).json({
@@ -84,14 +101,15 @@ async function getEvents(req, res) {
       });
     }
 
-    const events = await Event.listEvents({ search, categoryId, date });
-
-    return res.status(200).json({
-      success: true,
-      data: events
+    const events = await Event.listEvents({
+      search: String(search).trim(),
+      categoryId,
+      date
     });
+
+    return res.status(200).json({ success: true, data: events });
   } catch (error) {
-    return sendDatabaseError(error, res);
+    return handleDatabaseError(error, res);
   }
 }
 
@@ -117,12 +135,9 @@ async function getEventById(req, res) {
       });
     }
 
-    return res.status(200).json({
-      success: true,
-      data: event
-    });
+    return res.status(200).json({ success: true, data: event });
   } catch (error) {
-    return sendDatabaseError(error, res);
+    return handleDatabaseError(error, res);
   }
 }
 
@@ -141,14 +156,15 @@ async function addEvent(req, res) {
 
     const event = await Event.createEvent({
       eventName: String(body.eventName).trim(),
-      description: body.description
-        ? String(body.description).trim()
-        : null,
       eventDate: body.eventDate,
       startTime: body.startTime,
       endTime: body.endTime,
-      venue: String(body.venue).trim(),
-      categoryId: Number(body.categoryId)
+      gracePeriodMinutes: body.gracePeriodMinutes ?? 15,
+      venueId: body.venueId,
+      venueName: body.venue,
+      categoryId: Number(body.categoryId),
+      statusId: body.statusId,
+      termId: body.termId,
     });
 
     return res.status(201).json({
@@ -157,7 +173,7 @@ async function addEvent(req, res) {
       data: event
     });
   } catch (error) {
-    return sendDatabaseError(error, res);
+    return handleDatabaseError(error, res);
   }
 }
 
@@ -186,14 +202,14 @@ async function editEvent(req, res) {
 
     const event = await Event.updateEvent(Number(eventId), {
       eventName: String(body.eventName).trim(),
-      description: body.description
-        ? String(body.description).trim()
-        : null,
       eventDate: body.eventDate,
       startTime: body.startTime,
       endTime: body.endTime,
-      venue: String(body.venue).trim(),
-      categoryId: Number(body.categoryId)
+      gracePeriodMinutes: body.gracePeriodMinutes ?? 15,
+      venueId: body.venueId,
+      venueName: body.venue,
+      categoryId: Number(body.categoryId),
+      termId: body.termId
     });
 
     if (!event) {
@@ -210,7 +226,53 @@ async function editEvent(req, res) {
       data: event
     });
   } catch (error) {
-    return sendDatabaseError(error, res);
+    return handleDatabaseError(error, res);
+  }
+}
+
+async function deleteEvent(req, res) {
+  const eventId = Number(req.params.eventId);
+
+  if (!Number.isInteger(eventId) || eventId <= 0) {
+    return res.status(400).json({
+      success: false,
+      message: 'A valid eventId is required.',
+      data: null
+    });
+  }
+
+  try {
+    const deleted = await Event.deleteEvent(eventId);
+
+    if (!deleted) {
+      return res.status(404).json({
+        success: false,
+        message: 'Event not found.',
+        data: null
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: 'Event deleted successfully.',
+      data: null
+    });
+  } catch (error) {
+    if (error.code === 'ER_ROW_IS_REFERENCED_2' || error.errno === 1451) {
+      return res.status(409).json({
+        success: false,
+        message: 'Cannot delete this event because registrations or attendance records reference it.',
+        data: null
+      });
+    }
+
+    console.error('Delete event error:', error);
+
+    return res.status(500).json({
+      success: false,
+      message: 'A server error occurred while deleting the event.',
+      data: null
+    });
   }
 }
 
@@ -218,5 +280,6 @@ module.exports = {
   getEvents,
   getEventById,
   addEvent,
-  editEvent
+  editEvent,
+  deleteEvent
 };
