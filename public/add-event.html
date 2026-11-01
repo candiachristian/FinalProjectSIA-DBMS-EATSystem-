@@ -33,7 +33,13 @@
             id="name"
             required
             maxlength="100"
-            placeholder="e.g. Campus Sports Festival"/>
+            placeholder="e.g. Campus Sports Festival"
+          />
+          <label for="category">Category *</label>
+          <select id="category" required>
+            <option value="">Loading categories…</option>
+          </select>
+
           <div class="row">
             <div>
               <label>Date *</label><input id="date" type="date" required />
@@ -43,7 +49,6 @@
               <label>Venue *</label
               ><input id="venue" required placeholder="Building / room" />
             </div>
-
           </div>
 
           <div class="row">
@@ -54,7 +59,6 @@
             <div>
               <label>Ends *</label><input id="end" type="time" required />
             </div>
-
           </div>
           <label>On-time grace period (minutes)</label>
           <input id="grace" type="number" min="0" max="180" value="15" />
@@ -71,35 +75,115 @@
               style="background: #edf3fb; color: #284362; box-shadow: none"
               >Cancel
             </a>
-
           </div>
-
         </form>
-
       </section>
-
     </main>
 
     <script>
       requireRole("admin");
-      $("form").onsubmit = (e) => {
-        e.preventDefault();
-        if (
-          system.addEvent(
-            $("name").value.trim(),
-            $("date").value,
-            $("start").value,
-            $("end").value,
-            $("venue").value.trim(),
-            $("grace").value,
-          )
-        ) {
-          toast("Event created.");
-          setTimeout(() => (location.href = "show-events.html"), 650);
+
+      const categorySelect = $("category");
+      const eventForm = $("form");
+
+      async function loadCategories() {
+        categorySelect.innerHTML =
+          '<option value="">Loading categories…</option>';
+
+        try {
+          const response = await fetch("/api/event-categories");
+          const result = await response.json();
+
+          if (!response.ok || !result.success) {
+            throw new Error(result.message || "Could not load categories.");
+          }
+
+          const categories = result.data || [];
+
+          categorySelect.innerHTML =
+            '<option value="">Select a category</option>' +
+            categories
+              .map(
+                (category) => `
+          <option value="${Number(category.category_id)}">
+            ${escapeHtml(category.category_name)}
+          </option>
+        `,
+              )
+              .join("");
+
+          if (categories.length === 0) {
+            categorySelect.innerHTML =
+              '<option value="">No categories available</option>';
+          }
+        } catch (error) {
+          console.error("Could not load categories:", error);
+          categorySelect.innerHTML =
+            '<option value="">Could not load categories</option>';
+          alert(
+            "Could not load event categories. Check the API and try again.",
+          );
         }
-      };
+      }
+
+      function escapeHtml(value) {
+        return String(value ?? "").replace(
+          /[&<>"']/g,
+          (character) =>
+            ({
+              "&": "&amp;",
+              "<": "&lt;",
+              ">": "&gt;",
+              '"': "&quot;",
+              "'": "&#39;",
+            })[character],
+        );
+      }
+
+      eventForm.addEventListener("submit", async (event) => {
+        event.preventDefault();
+
+        const payload = {
+          eventName: $("name").value.trim(),
+          eventDate: $("date").value,
+          startTime: $("start").value,
+          endTime: $("end").value,
+          venue: $("venue").value.trim(),
+          gracePeriodMinutes: Number($("grace").value),
+          categoryId: Number(categorySelect.value),
+        };
+
+        if (!payload.categoryId) {
+          alert("Please select an event category.");
+          return;
+        }
+
+        try {
+          const response = await fetch("/api/events", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify(payload),
+          });
+
+          const result = await response.json();
+
+          if (!response.ok || !result.success) {
+            throw new Error(result.message || "Could not create event.");
+          }
+
+          toast("Event created.");
+          setTimeout(() => {
+            window.location.href = "show-events.html";
+          }, 650);
+        } catch (error) {
+          console.error("Create event error:", error);
+          alert(error.message || "Could not create event.");
+        }
+      });
+
+      loadCategories();
     </script>
-
   </body>
-
 </html>
