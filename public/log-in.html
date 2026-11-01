@@ -1,63 +1,102 @@
 <!doctype html>
 <html lang="en">
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
 
-  <title>Administrator Sign In · Events</title>
+    <title>Administrator Sign In · Events</title>
 
-  <link rel="stylesheet" href="style.css">
-  <script src="app.js"></script>
-</head>
+    <link rel="stylesheet" href="style.css" />
+    <script src="app.js"></script>
+  </head>
 
-<body>
-  <main class="panel auth">
-    <div class="brand">
-      <span class="brand-mark">📝</span>
-      <strong>Events</strong>
-    </div>
+  <body>
+    <main class="panel auth">
+      <div class="brand">
+        <span class="brand-mark">📝</span>
+        <strong>Events</strong>
+      </div>
 
-    <h2>Administrator sign in</h2>
-    <p class="hint">
-      Manage events and record student attendance.
-    </p>
+      <h2>Administrator sign in</h2>
+      <p class="hint">Manage events and record student attendance.</p>
 
-    <form id="login-form">
-      <label for="username">Admin username</label>
-      <input
-        id="username"
-        name="username"
-        type="text"
-        autocomplete="username"
-        placeholder="Enter administrator username"
-        required
-      >
+      <form id="login-form">
+        <label for="username">Admin username</label>
+        <input
+          id="username"
+          name="username"
+          type="text"
+          autocomplete="username"
+          placeholder="Enter administrator username"
+          required
+        />
 
-      <label for="password">Password</label>
-      <input
-        id="password"
-        name="password"
-        type="password"
-        autocomplete="current-password"
-        placeholder="Enter administrator password"
-        required
-      >
+        <label for="password">Password</label>
+        <input
+          id="password"
+          name="password"
+          type="password"
+          autocomplete="current-password"
+          placeholder="Enter administrator password"
+          required
+        />
 
-      <button type="submit" style="width: 100%; margin-top: 14px">
-        Sign in
-      </button>
-    </form>
+        <button type="submit" style="width: 100%; margin-top: 14px">
+          Sign in
+        </button>
+      </form>
 
-    <p id="login-error" class="notice error hidden">
-      Invalid administrator username or password.
-    </p>
-  </main>
+      <p id="login-error" class="notice error hidden">
+        Invalid administrator username or password.
+      </p>
+    </main>
 
-  <script>
-    document.getElementById('login-form').addEventListener('submit', event => {
-      event.preventDefault();
-      login();
-    });
-  </script>
-</body>
+    <script>
+      const form = document.getElementById("login-form");
+      const errorElement = document.getElementById("login-error");
+
+      function showError(message) {
+        errorElement.textContent = message;
+        errorElement.classList.remove("hidden");
+      }
+
+      form.addEventListener("submit", async (event) => {
+        event.preventDefault();
+        errorElement.classList.add("hidden");
+
+        try {
+          const response = await fetch("/api/auth/login", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              username: document.getElementById("username").value.trim(),
+              password: document.getElementById("password").value,
+            }),
+          });
+
+          const text = await response.text();
+          console.log("STATUS:", response.status, "BODY:", text);
+
+          let result;
+          try {
+            result = JSON.parse(text);
+          } catch {
+            showError("Server returned " + response.status + " (not JSON).");
+            return;
+          }
+
+          if (!response.ok || !result.success) {
+            showError(result.message || "Login failed.");
+            return;
+          }
+
+          localStorage.setItem("authToken", result.data.token);
+          window.location.href = "/index.html";
+        } catch (error) {
+          console.error("Fetch failed:", error);
+          showError("Cannot reach the server.");
+        }
+      });
+    </script>
+  </body>
 </html>

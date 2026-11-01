@@ -1,219 +1,93 @@
+'use strict';
 const Registration = require('../models/registration.model');
 
-function isPositiveInteger(value) {
-    return Number.isInteger(Number(value)) && Number(value) > 0;
-}
+const VALID_STATUSES = ['Registered', 'Cancelled'];
+const isPositiveInt = (v) => Number.isInteger(Number(v)) && Number(v) > 0;
 
-async function getRegistrations(req, res, next) {
-    try {
-        const { student_id } = req.query;
-
-        if (!student_id) {
-            return res.status(400).json({
-                success: false,
-                message: 'student_id is required'
-            });
-        }
-
-        if (!isPositiveInteger(student_id)) {
-            return res.status(400).json({
-                success: false,
-                message: 'student_id must be a positive integer'
-            });
-        }
-
-        const registrations =
-            await Registration.listForStudent(Number(student_id));
-
-        return res.status(200).json({
-            success: true,
-            data: registrations
-        });
-
-    } catch (error) {
-        next(error);
+function getAdminId(req) {
+    if (req.user && (req.user.user_id || req.user.id)) return req.user.user_id || req.user.id;
+    if (process.env.NODE_ENV !== 'production' && process.env.DEV_ADMIN_ID) {
+        return Number(process.env.DEV_ADMIN_ID);
     }
+    return null;
 }
 
-async function getRegistration(req, res, next) {
-    try {
-        const { id } = req.params;
-
-        if (!isPositiveInteger(id)) {
-            return res.status(400).json({
-                success: false,
-                message: 'registration id must be a positive integer'
-            });
-        }
-
-        const registration =
-            await Registration.getById(Number(id));
-
-        if (!registration) {
-            return res.status(404).json({
-                success: false,
-                message: 'Registration not found'
-            });
-        }
-
-        return res.status(200).json({
-            success: true,
-            data: registration
-        });
-
-    } catch (error) {
-        next(error);
+function sendError(res, error) {
+    if (error.httpStatus) {
+        return res.status(error.httpStatus).json({ success: false, error: error.code, message: error.message });
     }
+    console.error(error);
+    return res.status(500).json({ success: false, error: 'SERVER_ERROR', message: 'Something went wrong.' });
 }
 
-async function createRegistration(req, res, next) {
+exports.list = async (req, res) => {
     try {
-        const {
-            student_id,
-            event_id,
-            registration_status_id
-        } = req.body;
-
-        if (
-            !isPositiveInteger(student_id) ||
-            !isPositiveInteger(event_id) ||
-            !isPositiveInteger(registration_status_id)
-        ) {
-            return res.status(400).json({
-                success: false,
-                message:
-                    'student_id, event_id, and registration_status_id must be positive integers'
-            });
+        const { eventId, student_id } = req.query;
+        if (eventId !== undefined) {
+            if (!isPositiveInt(eventId)) {
+                return res.status(400).json({ success: false, message: 'eventId must be a positive number.' });
+            }
+            return res.json({ success: true, data: await Registration.getRosterByEvent(Number(eventId)) });
         }
-
-        const duplicate =
-            await Registration.findDuplicate(
-                Number(student_id),
-                Number(event_id)
-            );
-
-        if (duplicate) {
-            return res.status(409).json({
-                success: false,
-                message: 'Student is already registered for this event'
-            });
+        if (student_id !== undefined) {
+            if (!isPositiveInt(student_id)) {
+                return res.status(400).json({ success: false, message: 'student_id must be a positive number.' });
+            }
+            return res.json({ success: true, data: await Registration.listForStudent(Number(student_id)) });
         }
+        return res.status(400).json({ success: false, message: 'eventId query parameter is required.' });
+    } catch (e) { sendError(res, e); }
+};
 
-        const registrationId =
-            await Registration.add(
-                Number(student_id),
-                Number(event_id),
-                Number(registration_status_id)
-            );
-
-        const registration =
-            await Registration.getById(registrationId);
-
-        return res.status(201).json({
-            success: true,
-            message: 'Registration created successfully',
-            data: registration
-        });
-
-    } catch (error) {
-
-        if (error.code === 'ER_DUP_ENTRY') {
-            return res.status(409).json({
-                success: false,
-                message: 'Student is already registered for this event'
-            });
-        }
-
-        next(error);
-    }
-}
-
-async function updateRegistration(req, res, next) {
+exports.create = async (req, res) => {
     try {
-        const { id } = req.params;
-        const { registration_status_id } = req.body;
-
-        if (!isPositiveInteger(id)) {
-            return res.status(400).json({
-                success: false,
-                message: 'registration id must be a positive integer'
-            });
+        const { studentId, eventId } = req.body;
+        if (!isPositiveInt(studentId) || !isPositiveInt(eventId)) {
+            return res.status(400).json({ success: false, message: 'Valid studentId and eventId are required.' });
         }
-
-        if (!isPositiveInteger(registration_status_id)) {
-            return res.status(400).json({
-                success: false,
-                message:
-                    'registration_status_id must be a positive integer'
-            });
+        const registeredBy = getAdminId(req);
+        if (registeredBy == null) {
+            return res.status(401).json({ success: false, message: 'Not authenticated.' });
         }
+        const data = await Registration.createRegistration({
+            studentId: Number(studentId), eventId: Number(eventId), registeredBy });
+        res.status(201).json({ success: true, data });
+    } catch (e) { sendError(res, e); }
+};
 
-        const existing =
-            await Registration.getById(Number(id));
-
-        if (!existing) {
-            return res.status(404).json({
-                success: false,
-                message: 'Registration not found'
-            });
-        }
-
-        await Registration.updateStatus(
-            Number(id),
-            Number(registration_status_id)
-        );
-
-        const updated =
-            await Registration.getById(Number(id));
-
-        return res.status(200).json({
-            success: true,
-            message: 'Registration updated successfully',
-            data: updated
-        });
-
-    } catch (error) {
-        next(error);
-    }
-}
-
-async function deleteRegistration(req, res, next) {
+exports.updateStatus = async (req, res) => {
     try {
-        const { id } = req.params;
-
-        if (!isPositiveInteger(id)) {
-            return res.status(400).json({
-                success: false,
-                message: 'registration id must be a positive integer'
-            });
+        const { status } = req.body;
+        if (!isPositiveInt(req.params.id) || !VALID_STATUSES.includes(status)) {
+            return res.status(400).json({ success: false, message: 'Valid id and status (Registered or Cancelled) required.' });
         }
+        const data = await Registration.updateStatusByName(Number(req.params.id), status);
+        res.json({ success: true, data });
+    } catch (e) { sendError(res, e); }
+};
 
-        const existing =
-            await Registration.getById(Number(id));
-
-        if (!existing) {
-            return res.status(404).json({
-                success: false,
-                message: 'Registration not found'
-            });
+exports.remove = async (req, res) => {
+    try {
+        if (!isPositiveInt(req.params.id)) {
+            return res.status(400).json({ success: false, message: 'Valid id required.' });
         }
+        await Registration.deleteRegistration(Number(req.params.id));
+        res.json({ success: true, message: 'Registration deleted.' });
+    } catch (e) { sendError(res, e); }
+};
 
-        await Registration.remove(Number(id));
+exports.lookupStudents = async (req, res) => {
+    try {
+        const term = String(req.query.search || '').trim();
+        if (term.length < 1) {
+            return res.status(400).json({ success: false, message: 'search is required.' });
+        }
+        res.json({ success: true, data: await Registration.searchStudents(term) });
+    } catch (e) { sendError(res, e); }
+};
 
-        return res.status(200).json({
-            success: true,
-            message: 'Registration cancelled/deleted successfully'
-        });
-
-    } catch (error) {
-        next(error);
-    }
-}
-
-module.exports = {
-    getRegistrations,
-    getRegistration,
-    createRegistration,
-    updateRegistration,
-    deleteRegistration
+exports.lookupEvents = async (req, res) => {
+    try {
+        res.json({ success: true, data: await Registration.listEvents() });
+    } catch (e) { sendError(res, e); }
 };

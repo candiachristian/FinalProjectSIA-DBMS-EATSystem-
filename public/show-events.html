@@ -1,0 +1,117 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+
+  <title>Manage Events</title>
+
+  <link rel="stylesheet" href="style.css">
+  <script src="app.js"></script>
+</head>
+
+<body>
+  <header>
+    <div class="brand">
+      <span class="brand-mark">📝</span>
+      <h1>Manage events</h1>
+    </div>
+
+    <a href="index.html" style="color: white">Dashboard</a>
+  </header>
+
+  <main class="wrap">
+    <div class="title-row">
+      <h2>All events</h2>
+
+      <a class="button" href="add-event.html">
+        ＋ Add event
+      </a>
+    </div>
+
+    <section id="event-list" class="grid" aria-live="polite"></section>
+  </main>
+
+  <script>
+    requireAdmin();
+
+    function renderEvents() {
+      const events = system.getEvents();
+      const list = $('event-list');
+
+      if (events.length === 0) {
+        list.innerHTML = `
+          <div class="panel empty">
+            No events yet. Add your first event.
+          </div>
+        `;
+        return;
+      }
+
+      list.innerHTML = events.map(event => `
+        <article class="panel">
+          <div class="title-row">
+            <h3>${esc(event.name)}</h3>
+
+            <span class="badge ${eventStatus(event)}">
+              ${eventStatus(event)}
+            </span>
+          </div>
+
+          <p>
+            <strong>Date:</strong> ${esc(event.date)}
+          </p>
+
+          <p>
+            <strong>Time:</strong>
+            ${fmt12(event.start)}–${fmt12(event.end)}
+          </p>
+
+          <p>
+            <strong>Venue:</strong> ${esc(event.venue)}
+          </p>
+
+          <p>
+            <strong>Grace period:</strong> ${Number(event.grace) || 0} minutes
+          </p>
+
+          <p>
+            <strong>Registered students:</strong> ${event.attendees.length}
+          </p>
+
+          <div class="actions">
+            <a
+              class="button"
+              href="attendance.html?event=${event.id}"
+            >
+              Open attendance
+            </a>
+
+            <button
+              class="danger"
+              type="button"
+              onclick="deleteEvent(${event.id})"
+            >
+              Delete event
+            </button>
+          </div>
+        </article>
+      `).join('');
+    }
+
+    function deleteEvent(eventId) {
+      const confirmed = confirm(
+        'Delete this event and all associated attendance records?'
+      );
+
+      if (!confirmed) return;
+
+      system.deleteEvent(eventId);
+      renderEvents();
+      toast('Event deleted.');
+    }
+
+    renderEvents();
+  </script>
+</body>
+</html>
