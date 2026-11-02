@@ -1,5 +1,4 @@
 const bcrypt = require('bcryptjs');
-const jwt = require('jsonwebtoken');
 const Auth = require('../models/auth.model');
 
 async function login(req, res) {
@@ -42,27 +41,10 @@ async function login(req, res) {
       });
     }
 
-    if (!process.env.JWT_SECRET) {
-      throw new Error('JWT_SECRET is not configured.');
-    }
-
-    const token = jwt.sign(
-      {
-        username: user.username,
-        role: user.role_name
-      },
-      process.env.JWT_SECRET,
-      {
-        subject: String(user.user_id),
-        expiresIn: '2h'
-      }
-    );
-
     return res.status(200).json({
       success: true,
       message: 'Login successful.',
       data: {
-        token,
         user: {
           userId: user.user_id,
           username: user.username,
@@ -81,19 +63,4 @@ async function login(req, res) {
   }
 }
 
-function me(req, res) {
-  return res.status(200).json({
-    success: true,
-    message: 'Authenticated admin account.',
-    data: {
-      userId: req.user.userId,
-      username: req.user.username,
-      role: req.user.role
-    }
-  });
-}
-
-module.exports = {
-  login,
-  me
-};
+module.exports = { login };
