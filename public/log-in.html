@@ -90,7 +90,7 @@
             return;
           }
 
-          localStorage.setItem("authToken", result.data.token);
+          localStorage.setItem("adminSession", JSON.stringify(result.data.user));
           window.location.href = "/index.html";
         } catch (error) {
           console.error("Fetch failed:", error);
