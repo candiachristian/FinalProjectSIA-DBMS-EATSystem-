@@ -61,57 +61,21 @@ function toast(message) {
   }, 3300);
 }
 
-const TOKEN_KEY = "authToken";
-
-function parseToken(token) {
-  try {
-    const base64 = token.split(".")[1].replace(/-/g, "+").replace(/_/g, "/");
-    return JSON.parse(atob(base64));
-  } catch {
-    return null;
-  }
-}
-
-function getToken() {
-  return localStorage.getItem(TOKEN_KEY);
-}
+const SESSION_KEY = "adminSession";
 
 function getSession() {
-  const token = getToken();
-  const payload = token ? parseToken(token) : null;
-
-  if (!payload || (payload.exp && payload.exp * 1000 < Date.now())) {
-    localStorage.removeItem(TOKEN_KEY);
+  try {
+    return JSON.parse(localStorage.getItem(SESSION_KEY) || "null");
+  } catch {
+    localStorage.removeItem(SESSION_KEY);
     return null;
   }
-
-  return {
-    userId: Number(payload.sub),
-    username: payload.username,
-    role: payload.role,
-  };
 }
 
 function logout() {
-  localStorage.removeItem(TOKEN_KEY);
+  localStorage.removeItem(SESSION_KEY);
   localStorage.removeItem("session");
   location.href = "log-in.html";
-}
-
-async function authFetch(url, options = {}) {
-  const response = await fetch(url, {
-    ...options,
-    headers: {
-      ...(options.headers || {}),
-      Authorization: `Bearer ${getToken()}`,
-    },
-  });
-
-  if (response.status === 401 || response.status === 403) {
-    logout();
-  }
-
-  return response;
 }
 
 function requireAdmin() {
@@ -120,7 +84,6 @@ function requireAdmin() {
     return false;
   }
 
-  authFetch("/api/auth/me").catch(() => {});
   return true;
 }
 
@@ -319,12 +282,13 @@ class AttendanceSystem {
 
 const eatApi = (() => {
   async function request(url, options = {}) {
+    const headers = { ...(options.headers || {}) };
+    if (!(options.body instanceof FormData)) {
+      headers["Content-Type"] = "application/json";
+    }
     const res = await fetch(url, {
       ...options,
-      headers: {
-        ...(options.headers || {}),
-        "Content-Type": "application/json",
-      },
+      headers,
     });
 
     const body = await res.json().catch(() => ({}));
@@ -347,8 +311,24 @@ const eatApi = (() => {
       return list.find((s) => s.student_number === number) || null;
     },
 
-    register: (studentId, eventId) =>
-      send("POST", "/api/registrations", { studentId, eventId }),
+    register: (studentOrId, eventId, proofFile) => {
+      const formData = new FormData();
+      formData.append("eventId", String(eventId));
+      if (studentOrId && typeof studentOrId === "object") {
+        Object.entries(studentOrId).forEach(([key, value]) => {
+          if (value !== undefined && value !== null) {
+            formData.append(key, String(value));
+          }
+        });
+      } else {
+        formData.append("studentId", String(studentOrId));
+      }
+      formData.append("proof", proofFile);
+      return request("/api/registrations", {
+        method: "POST",
+        body: formData,
+      });
+    },
     removeRegistration: (registrationId) =>
       request("/api/registrations/" + registrationId, { method: "DELETE" }),
 
