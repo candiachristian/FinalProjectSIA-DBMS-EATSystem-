@@ -376,10 +376,6 @@
                 programs.forEach((program) => {
                   const option = document.createElement("option");
 
-                  /*
-                   * The value is the program name because the existing
-                   * registration API expects programName.
-                   */
                   option.value = program.program_name;
                   option.textContent = program.program_name;
 
@@ -439,10 +435,6 @@
                   middleName: $("middle-name").value.trim(),
                   lastName: $("last-name").value.trim(),
 
-                  /*
-                   * These names are sent to the existing registration API.
-                   * Do not change them to departmentId or programId here.
-                   */
                   departmentName,
                   programName,
 
