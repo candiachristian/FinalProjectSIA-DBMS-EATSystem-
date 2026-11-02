@@ -130,3 +130,6 @@ CREATE TABLE attendance_notes (
     FOREIGN KEY (attendance_id) REFERENCES attendance(attendance_id),
     FOREIGN KEY (added_by) REFERENCES users(user_id)
 );
+
+ALTER TABLE registration
+ADD COLUMN proof_image_path VARCHAR(255) NULL;
