@@ -225,12 +225,10 @@
                       </select>
 
 
-                      <label for="program">Program / course</label>
-                      <input
-                        id="program"
-                        required
-                        placeholder="e.g., BS Information Technology"
-                      />
+                      <label for="program">Program / course *</label>
+                      <select id="program" required disabled>
+                        <option value="">Select a department first</option>
+                      </select>
 
                       <label for="year-section">Year &amp; section</label>
                       <input
@@ -305,8 +303,20 @@
 
           if (form) {
             const departmentSelect = $("department");
+            const programSelect = $("program");
 
             async function loadDepartments() {
+              departmentSelect.disabled = true;
+              programSelect.disabled = true;
+
+              departmentSelect.innerHTML = `
+      <option value="">Loading departments...</option>
+    `;
+
+              programSelect.innerHTML = `
+      <option value="">Select a department first</option>
+    `;
+
               try {
                 const departments = await eatApi.departments();
 
@@ -317,30 +327,100 @@
                 departments.forEach((department) => {
                   const option = document.createElement("option");
 
-                  option.value = department.department_name;
+                  option.value = String(department.department_id);
                   option.textContent = department.department_name;
 
                   departmentSelect.appendChild(option);
                 });
+
+                departmentSelect.disabled = false;
               } catch (error) {
                 departmentSelect.innerHTML = `
         <option value="">Could not load departments</option>
       `;
 
-                departmentSelect.disabled = true;
-
-                toast(
-                  "Could not load departments. Please check the departments API.",
-                );
+                toast("Could not load departments: " + error.message);
               }
             }
 
-            loadDepartments();
+            async function loadPrograms(departmentId) {
+              programSelect.disabled = true;
+
+              programSelect.innerHTML = `
+      <option value="">Loading programs...</option>
+    `;
+
+              if (!departmentId) {
+                programSelect.innerHTML = `
+        <option value="">Select a department first</option>
+      `;
+
+                return;
+              }
+
+              try {
+                const programs = await eatApi.programs(departmentId);
+
+                if (programs.length === 0) {
+                  programSelect.innerHTML = `
+          <option value="">No programs found for this department</option>
+        `;
+
+                  return;
+                }
+
+                programSelect.innerHTML = `
+        <option value="">Select a program</option>
+      `;
+
+                programs.forEach((program) => {
+                  const option = document.createElement("option");
+
+                  /*
+                   * The value is the program name because the existing
+                   * registration API expects programName.
+                   */
+                  option.value = program.program_name;
+                  option.textContent = program.program_name;
+
+                  programSelect.appendChild(option);
+                });
+
+                programSelect.disabled = false;
+              } catch (error) {
+                programSelect.innerHTML = `
+        <option value="">Could not load programs</option>
+      `;
+
+                toast("Could not load programs: " + error.message);
+              }
+            }
+
+            departmentSelect.addEventListener("change", async () => {
+              await loadPrograms(departmentSelect.value);
+            });
+
+            await loadDepartments();
 
             form.onsubmit = async (eventObject) => {
               eventObject.preventDefault();
 
               try {
+                const departmentName =
+                  departmentSelect.options[
+                    departmentSelect.selectedIndex
+                  ]?.textContent?.trim() || "";
+
+                const programName = programSelect.value.trim();
+
+                if (!departmentSelect.value || !departmentName) {
+                  throw new Error("Please select a department.");
+                }
+
+                if (!programName) {
+                  throw new Error("Please select a program.");
+                }
+
                 const yearSection = $("year-section").value.trim();
 
                 const yearSectionMatch = /^([1-5])\s*-\s*(.{1,20})$/.exec(
@@ -353,19 +433,19 @@
                   );
                 }
 
-                if (!$("department").value) {
-                  throw new Error("Please select a department.");
-                }
-
                 const studentDetails = {
                   studentNumber: $("sid").value.trim(),
                   firstName: $("first-name").value.trim(),
                   middleName: $("middle-name").value.trim(),
                   lastName: $("last-name").value.trim(),
 
-                  departmentName: $("department").value.trim(),
+                  /*
+                   * These names are sent to the existing registration API.
+                   * Do not change them to departmentId or programId here.
+                   */
+                  departmentName,
+                  programName,
 
-                  programName: $("program").value.trim(),
                   yearLevel: Number(yearSectionMatch[1]),
                   section: yearSectionMatch[2].trim(),
                 };
