@@ -32,6 +32,8 @@
     </main>
 
     <script>
+      requireAdmin();
+
       (async () => {
         const events = {};
 
@@ -96,6 +98,9 @@
           const timeIn = row.time_in
             ? fmt12(String(row.time_in).slice(11, 16))
             : "—";
+          const proofLink = row.proof_image_path
+            ? `<a href="${esc(row.proof_image_path)}" target="_blank" rel="noopener">View photo</a>`
+            : "—";
 
           return `
             <tr>
@@ -107,7 +112,7 @@
                 ${esc([row.year_level, row.section].filter(Boolean).join(" - "))}
               </td>
               <td>${timeIn}</td>
-              <td>—</td>
+              <td>${proofLink}</td>
               <td>
                 <span class="badge ${esc(attendanceStatus)}">
                   ${esc(attendanceStatus)}
@@ -215,18 +220,21 @@
                       <label for="department">Department</label>
                       <input
                         id="department"
+                        required
                         placeholder="e.g., College of Arts and Sciences"
                       />
 
                       <label for="program">Program / course</label>
                       <input
                         id="program"
+                        required
                         placeholder="e.g., BS Information Technology"
                       />
 
                       <label for="year-section">Year &amp; section</label>
                       <input
                         id="year-section"
+                        required
                         placeholder="e.g., 2 - A"
                       />
 
@@ -299,35 +307,22 @@
               eventObject.preventDefault();
 
               try {
-                const studentNumber = $("sid").value.trim();
-                const student = await eatApi.findStudentByNumber(studentNumber);
-
-                if (!student) {
-                  throw new Error(
-                    "Student ID was not found in the database. Add the student to the students table first."
-                  );
+                const yearSection = $("year-section").value.trim();
+                const yearSectionMatch = /^([1-5])\s*-\s*(.{1,20})$/.exec(yearSection);
+                if (!yearSectionMatch) {
+                  throw new Error("Enter year and section as, for example, 2 - A.");
                 }
 
-                const enteredFirstName = $("first-name").value.trim();
-                const enteredLastName = $("last-name").value.trim();
-
-                if (
-                  enteredFirstName.toLowerCase() !==
-                  String(student.first_name || "").trim().toLowerCase()
-                ) {
-                  throw new Error(
-                    "First name does not match the student record."
-                  );
-                }
-
-                if (
-                  enteredLastName.toLowerCase() !==
-                  String(student.last_name || "").trim().toLowerCase()
-                ) {
-                  throw new Error(
-                    "Last name does not match the student record."
-                  );
-                }
+                const studentDetails = {
+                  studentNumber: $("sid").value.trim(),
+                  firstName: $("first-name").value.trim(),
+                  middleName: $("middle-name").value.trim(),
+                  lastName: $("last-name").value.trim(),
+                  departmentName: $("department").value.trim(),
+                  programName: $("program").value.trim(),
+                  yearLevel: Number(yearSectionMatch[1]),
+                  section: yearSectionMatch[2].trim()
+                };
 
                 const photo = $("proof").files[0];
 
@@ -335,8 +330,8 @@
                   throw new Error("Please select the required photo proof.");
                 }
 
-                if (!photo.type.startsWith("image/")) {
-                  throw new Error("Photo proof must be an image file.");
+                if (!["image/jpeg", "image/png", "image/gif", "image/webp"].includes(photo.type)) {
+                  throw new Error("Photo proof must be a JPEG, PNG, GIF, or WEBP image.");
                 }
 
                 if (photo.size > 1024 * 1024) {
@@ -344,15 +339,14 @@
                 }
 
                 const registration = await eatApi.register(
-                  student.student_id,
-                  Number(eventId)
+                  studentDetails,
+                  Number(eventId),
+                  photo
                 );
 
                 await eatApi.recordAttendance(registration.registrationId);
 
-                toast(
-                  "Student registered and time-in recorded. The current API does not save the selected photo."
-                );
+                toast("Photo proof saved; student registered and time-in recorded.");
 
                 await window.draw();
               } catch (error) {
