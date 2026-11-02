@@ -1,16 +1,30 @@
 "use strict";
 const Registration = require("../models/registration.model");
+const fs = require("fs/promises");
+const path = require("path");
 
 const VALID_STATUSES = ["Registered", "Cancelled"];
 const isPositiveInt = (v) => Number.isInteger(Number(v)) && Number(v) > 0;
+const proofDirectory = path.resolve(__dirname, "../../public/uploads/proofs");
 
-function getAdminId(req) {
-  if (req.user && (req.user.user_id || req.user.id))
-    return req.user.user_id || req.user.id;
-  if (process.env.NODE_ENV !== "production" && process.env.DEV_ADMIN_ID) {
-    return Number(process.env.DEV_ADMIN_ID);
+async function removeStoredProof(proofPath) {
+  if (typeof proofPath !== "string" || !/^\/uploads\/proofs\/[A-Za-z0-9._-]+$/.test(proofPath)) {
+    return;
   }
-  return null;
+  try {
+    await fs.unlink(path.join(proofDirectory, path.basename(proofPath)));
+  } catch (error) {
+    if (error.code !== "ENOENT") console.error("Could not remove proof image:", error);
+  }
+}
+
+async function removeNewUpload(file) {
+  if (!file?.path) return;
+  try {
+    await fs.unlink(file.path);
+  } catch (error) {
+    if (error.code !== "ENOENT") console.error("Could not remove failed proof upload:", error);
+  }
 }
 
 function sendError(res, error) {
@@ -73,22 +87,67 @@ exports.list = async (req, res) => {
 
 exports.create = async (req, res) => {
   try {
-    const { studentId, eventId } = req.body;
+    const body = req.body || {};
+    const { studentId, eventId } = body;
 
-    if (!isPositiveInt(studentId) || !isPositiveInt(eventId)) {
+    if (!isPositiveInt(eventId) ||
+        (studentId !== undefined && studentId !== '' && !isPositiveInt(studentId))) {
+      await removeNewUpload(req.file);
       return res.status(400).json({
         success: false,
-        message: "Valid studentId and eventId are required.",
+        message: "A valid eventId is required; if supplied, studentId must be a positive integer.",
       });
     }
 
+    if (!req.file) {
+      return res.status(400).json({
+        success: false,
+        message: "A proof image is required.",
+        data: null,
+      });
+    }
+
+    let studentDetails = null;
+    if (studentId === undefined || studentId === '') {
+      const yearLevel = Number(body.yearLevel);
+      studentDetails = {
+        studentNumber: body.studentNumber,
+        firstName: body.firstName,
+        middleName: body.middleName,
+        lastName: body.lastName,
+        departmentName: body.departmentName,
+        programName: body.programName,
+        yearLevel,
+        section: body.section,
+      };
+      if (!studentDetails.studentNumber || !studentDetails.firstName ||
+          !studentDetails.lastName || !studentDetails.departmentName ||
+          !studentDetails.programName || !Number.isInteger(yearLevel) ||
+          yearLevel < 1 || yearLevel > 5 || !studentDetails.section) {
+        await removeNewUpload(req.file);
+        return res.status(400).json({
+          success: false,
+          message: "Enter student ID, first and last name, department, program, year (1-5), and section.",
+          data: null,
+        });
+      }
+    }
+
     const data = await Registration.createRegistration({
-      studentId: Number(studentId),
+      studentId: studentId === undefined || studentId === '' ? null : Number(studentId),
+      studentDetails,
       eventId: Number(eventId),
+      proofImagePath: `/uploads/proofs/${req.file.filename}`,
     });
+
+    if (data.oldProofImagePath) {
+      await removeStoredProof(data.oldProofImagePath);
+      delete data.oldProofImagePath;
+    }
 
     return res.status(201).json({ success: true, data });
   } catch (e) {
+    await removeNewUpload(req.file);
     return sendError(res, e);
   }
 };
@@ -121,7 +180,8 @@ exports.remove = async (req, res) => {
         .status(400)
         .json({ success: false, message: "Valid id required." });
     }
-    await Registration.deleteRegistration(Number(req.params.id));
+    const proofPath = await Registration.deleteRegistration(Number(req.params.id));
+    await removeStoredProof(proofPath);
     res.json({ success: true, message: "Registration deleted." });
   } catch (e) {
     sendError(res, e);
