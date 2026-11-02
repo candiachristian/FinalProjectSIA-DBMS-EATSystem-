@@ -300,6 +300,12 @@ const eatApi = (() => {
 
   return {
     events: () => request("/api/registrations/lookup/events"),
+
+    departments: () => request("/api/departments"),
+
+    programs: (departmentId) =>
+      request("/api/programs?departmentId=" + encodeURIComponent(departmentId)),
+
     roster: (eventId) =>
       request("/api/attendance?eventId=" + encodeURIComponent(eventId)),
 

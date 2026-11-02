@@ -40,15 +40,16 @@
         const asLocal = (event) => ({
           date: event.event_date,
           start: event.start_time,
-          end: event.end_time
+          end: event.end_time,
         });
 
         async function loadEvents() {
-          const requestedEventId = new URLSearchParams(location.search).get("event");
+          const requestedEventId = new URLSearchParams(location.search).get(
+            "event",
+          );
           const eventList = await eatApi.events();
 
-          $("event").innerHTML =
-            '<option value="">Choose an event…</option>';
+          $("event").innerHTML = '<option value="">Choose an event…</option>';
 
           eventList.forEach((event) => {
             events[event.event_id] = event;
@@ -57,7 +58,7 @@
               "beforeend",
               `<option value="${event.event_id}">
                 ${esc(event.event_name)} · ${esc(String(event.event_date).slice(0, 10))} · ${fmt12(event.start_time)}
-              </option>`
+              </option>`,
             );
           });
 
@@ -68,31 +69,32 @@
 
         function rowHtml(row, completed) {
           const attendanceStatus =
-            row.attendance_status || (completed ? "Not recorded" : "Registered");
+            row.attendance_status ||
+            (completed ? "Not recorded" : "Registered");
 
           const actions = [];
 
           if (row.attendance_id === null) {
             actions.push(
-              `<button data-act="record" data-reg="${row.registration_id}">Record time-in</button>`
+              `<button data-act="record" data-reg="${row.registration_id}">Record time-in</button>`,
             );
             actions.push(
-              `<button data-act="absent" data-reg="${row.registration_id}">Absent</button>`
+              `<button data-act="absent" data-reg="${row.registration_id}">Absent</button>`,
             );
           } else {
             actions.push(
-              `<button data-act="edit" data-att="${row.attendance_id}" data-status="${esc(attendanceStatus)}">Edit</button>`
+              `<button data-act="edit" data-att="${row.attendance_id}" data-status="${esc(attendanceStatus)}">Edit</button>`,
             );
           }
 
           actions.push(
             row.registration_status === "Registered"
               ? `<button data-act="cancel" data-reg="${row.registration_id}">Cancel registration</button>`
-              : `<button data-act="reregister" data-reg="${row.registration_id}">Re-register</button>`
+              : `<button data-act="reregister" data-reg="${row.registration_id}">Re-register</button>`,
           );
 
           actions.push(
-            `<button class="danger" data-act="remove" data-reg="${row.registration_id}">Remove</button>`
+            `<button class="danger" data-act="remove" data-reg="${row.registration_id}">Remove</button>`,
           );
 
           const timeIn = row.time_in
@@ -151,11 +153,11 @@
 
           const stats = {
             Registered: rows.filter(
-              (row) => row.registration_status === "Registered"
+              (row) => row.registration_status === "Registered",
             ).length,
             Present: countStatus("Present"),
             Late: countStatus("Late"),
-            Absent: countStatus("Absent")
+            Absent: countStatus("Absent"),
           };
 
           const registrationOpen = system.canRegister(asLocal(event));
@@ -166,7 +168,7 @@
               ${Object.entries(stats)
                 .map(
                   ([label, number]) =>
-                    `<div class="stat"><b>${number}</b> ${label}</div>`
+                    `<div class="stat"><b>${number}</b> ${label}</div>`,
                 )
                 .join("")}
             </div>
@@ -217,19 +219,16 @@
                         placeholder="Optional"
                       />
 
-                      <label for="department">Department</label>
-                      <input
-                        id="department"
-                        required
-                        placeholder="e.g., College of Arts and Sciences"
-                      />
+                      <label for="department">Department *</label>
+                      <select id="department" required>
+                        <option value="">Loading departments...</option>
+                      </select>
 
-                      <label for="program">Program / course</label>
-                      <input
-                        id="program"
-                        required
-                        placeholder="e.g., BS Information Technology"
-                      />
+
+                      <label for="program">Program / course *</label>
+                      <select id="program" required disabled>
+                        <option value="">Select a department first</option>
+                      </select>
 
                       <label for="year-section">Year &amp; section</label>
                       <input
@@ -303,14 +302,135 @@
           const form = $("reg-form");
 
           if (form) {
+            const departmentSelect = $("department");
+            const programSelect = $("program");
+
+            async function loadDepartments() {
+              departmentSelect.disabled = true;
+              programSelect.disabled = true;
+
+              departmentSelect.innerHTML = `
+      <option value="">Loading departments...</option>
+    `;
+
+              programSelect.innerHTML = `
+      <option value="">Select a department first</option>
+    `;
+
+              try {
+                const departments = await eatApi.departments();
+
+                departmentSelect.innerHTML = `
+        <option value="">Select a department</option>
+      `;
+
+                departments.forEach((department) => {
+                  const option = document.createElement("option");
+
+                  option.value = String(department.department_id);
+                  option.textContent = department.department_name;
+
+                  departmentSelect.appendChild(option);
+                });
+
+                departmentSelect.disabled = false;
+              } catch (error) {
+                departmentSelect.innerHTML = `
+        <option value="">Could not load departments</option>
+      `;
+
+                toast("Could not load departments: " + error.message);
+              }
+            }
+
+            async function loadPrograms(departmentId) {
+              programSelect.disabled = true;
+
+              programSelect.innerHTML = `
+      <option value="">Loading programs...</option>
+    `;
+
+              if (!departmentId) {
+                programSelect.innerHTML = `
+        <option value="">Select a department first</option>
+      `;
+
+                return;
+              }
+
+              try {
+                const programs = await eatApi.programs(departmentId);
+
+                if (programs.length === 0) {
+                  programSelect.innerHTML = `
+          <option value="">No programs found for this department</option>
+        `;
+
+                  return;
+                }
+
+                programSelect.innerHTML = `
+        <option value="">Select a program</option>
+      `;
+
+                programs.forEach((program) => {
+                  const option = document.createElement("option");
+
+                  /*
+                   * The value is the program name because the existing
+                   * registration API expects programName.
+                   */
+                  option.value = program.program_name;
+                  option.textContent = program.program_name;
+
+                  programSelect.appendChild(option);
+                });
+
+                programSelect.disabled = false;
+              } catch (error) {
+                programSelect.innerHTML = `
+        <option value="">Could not load programs</option>
+      `;
+
+                toast("Could not load programs: " + error.message);
+              }
+            }
+
+            departmentSelect.addEventListener("change", async () => {
+              await loadPrograms(departmentSelect.value);
+            });
+
+            await loadDepartments();
+
             form.onsubmit = async (eventObject) => {
               eventObject.preventDefault();
 
               try {
+                const departmentName =
+                  departmentSelect.options[
+                    departmentSelect.selectedIndex
+                  ]?.textContent?.trim() || "";
+
+                const programName = programSelect.value.trim();
+
+                if (!departmentSelect.value || !departmentName) {
+                  throw new Error("Please select a department.");
+                }
+
+                if (!programName) {
+                  throw new Error("Please select a program.");
+                }
+
                 const yearSection = $("year-section").value.trim();
-                const yearSectionMatch = /^([1-5])\s*-\s*(.{1,20})$/.exec(yearSection);
+
+                const yearSectionMatch = /^([1-5])\s*-\s*(.{1,20})$/.exec(
+                  yearSection,
+                );
+
                 if (!yearSectionMatch) {
-                  throw new Error("Enter year and section as, for example, 2 - A.");
+                  throw new Error(
+                    "Enter year and section as, for example, 2 - A.",
+                  );
                 }
 
                 const studentDetails = {
@@ -318,10 +438,16 @@
                   firstName: $("first-name").value.trim(),
                   middleName: $("middle-name").value.trim(),
                   lastName: $("last-name").value.trim(),
-                  departmentName: $("department").value.trim(),
-                  programName: $("program").value.trim(),
+
+                  /*
+                   * These names are sent to the existing registration API.
+                   * Do not change them to departmentId or programId here.
+                   */
+                  departmentName,
+                  programName,
+
                   yearLevel: Number(yearSectionMatch[1]),
-                  section: yearSectionMatch[2].trim()
+                  section: yearSectionMatch[2].trim(),
                 };
 
                 const photo = $("proof").files[0];
@@ -330,8 +456,17 @@
                   throw new Error("Please select the required photo proof.");
                 }
 
-                if (!["image/jpeg", "image/png", "image/gif", "image/webp"].includes(photo.type)) {
-                  throw new Error("Photo proof must be a JPEG, PNG, GIF, or WEBP image.");
+                if (
+                  ![
+                    "image/jpeg",
+                    "image/png",
+                    "image/gif",
+                    "image/webp",
+                  ].includes(photo.type)
+                ) {
+                  throw new Error(
+                    "Photo proof must be a JPEG, PNG, GIF, or WEBP image.",
+                  );
                 }
 
                 if (photo.size > 1024 * 1024) {
@@ -341,12 +476,14 @@
                 const registration = await eatApi.register(
                   studentDetails,
                   Number(eventId),
-                  photo
+                  photo,
                 );
 
                 await eatApi.recordAttendance(registration.registrationId);
 
-                toast("Photo proof saved; student registered and time-in recorded.");
+                toast(
+                  "Photo proof saved; student registered and time-in recorded.",
+                );
 
                 await window.draw();
               } catch (error) {
@@ -375,7 +512,7 @@
             } else if (action === "edit") {
               const status = prompt(
                 "New status (Present, Late or Absent):",
-                button.dataset.status
+                button.dataset.status,
               );
 
               if (!status) return;
@@ -385,7 +522,7 @@
               if (status !== "Absent") {
                 const timeIn = prompt(
                   "Time in (YYYY-MM-DD HH:mm), leave empty to keep:",
-                  ""
+                  "",
                 );
 
                 if (timeIn) payload.timeIn = timeIn;
@@ -394,16 +531,10 @@
               await eatApi.editAttendance(attendanceId, payload);
               toast("Attendance updated.");
             } else if (action === "cancel") {
-              await eatApi.setRegistrationStatus(
-                registrationId,
-                "Cancelled"
-              );
+              await eatApi.setRegistrationStatus(registrationId, "Cancelled");
               toast("Registration cancelled.");
             } else if (action === "reregister") {
-              await eatApi.setRegistrationStatus(
-                registrationId,
-                "Registered"
-              );
+              await eatApi.setRegistrationStatus(registrationId, "Registered");
               toast("Student re-registered.");
             } else if (action === "remove") {
               if (!confirm("Remove this registration?")) return;
