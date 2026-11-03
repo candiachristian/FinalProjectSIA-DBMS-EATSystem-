@@ -4,24 +4,43 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
 
-    <title>Administrator Sign In · Events</title>
+    <title>Administrator Sign In · EAT System</title>
 
     <link rel="stylesheet" href="style.css" />
     <script src="app.js"></script>
   </head>
 
-  <body>
+  <body class="login-page">
+    <!-- EAT System Intro Animation -->
+    <div class="eat-splash" aria-hidden="true">
+      <div class="eat-splash-content">
+        <div class="eat-splash-title">
+          <span>EAT</span>
+          <span class="eat-splash-system">System</span>
+        </div>
+
+        <div class="eat-splash-line"></div>
+
+        <p>Event Attendance Tracking System</p>
+      </div>
+    </div>
+
+    <!-- Administrator Login Portal -->
     <main class="panel auth">
       <div class="brand">
         <span class="brand-mark">📝</span>
-        <strong>Events</strong>
+        <strong>EAT System</strong>
       </div>
 
       <h2>Administrator sign in</h2>
-      <p class="hint">Manage events and record student attendance.</p>
+
+      <p class="hint">
+        Manage events and record student attendance.
+      </p>
 
       <form id="login-form">
         <label for="username">Admin username</label>
+
         <input
           id="username"
           name="username"
@@ -32,6 +51,7 @@
         />
 
         <label for="password">Password</label>
+
         <input
           id="password"
           name="password"
@@ -41,12 +61,21 @@
           required
         />
 
-        <button type="submit" style="width: 100%; margin-top: 14px">
+        <button
+          id="login-button"
+          type="submit"
+          style="width: 100%; margin-top: 14px"
+        >
           Sign in
         </button>
       </form>
 
-      <p id="login-error" class="notice error hidden">
+      <p
+        id="login-error"
+        class="notice error hidden"
+        role="alert"
+        aria-live="polite"
+      >
         Invalid administrator username or password.
       </p>
     </main>
@@ -54,47 +83,100 @@
     <script>
       const form = document.getElementById("login-form");
       const errorElement = document.getElementById("login-error");
+      const loginButton = document.getElementById("login-button");
 
       function showError(message) {
         errorElement.textContent = message;
         errorElement.classList.remove("hidden");
       }
 
+      function hideError() {
+        errorElement.textContent = "";
+        errorElement.classList.add("hidden");
+      }
+
       form.addEventListener("submit", async (event) => {
         event.preventDefault();
-        errorElement.classList.add("hidden");
+
+        hideError();
+
+        const username = document
+          .getElementById("username")
+          .value
+          .trim();
+
+        const password = document.getElementById("password").value;
+
+        if (!username || !password) {
+          showError("Username and password are required.");
+          return;
+        }
+
+        loginButton.disabled = true;
+        loginButton.textContent = "Signing in...";
 
         try {
           const response = await fetch("/api/auth/login", {
             method: "POST",
-            headers: { "Content-Type": "application/json" },
+            headers: {
+              "Content-Type": "application/json",
+            },
             body: JSON.stringify({
-              username: document.getElementById("username").value.trim(),
-              password: document.getElementById("password").value,
+              username,
+              password,
             }),
           });
 
           const text = await response.text();
-          console.log("STATUS:", response.status, "BODY:", text);
+
+          console.log(
+            "Login status:",
+            response.status,
+            "Response:",
+            text
+          );
 
           let result;
+
           try {
             result = JSON.parse(text);
           } catch {
-            showError("Server returned " + response.status + " (not JSON).");
+            showError(
+              "The server returned an invalid response."
+            );
+
             return;
           }
 
           if (!response.ok || !result.success) {
-            showError(result.message || "Login failed.");
+            showError(
+              result.message ||
+                "Invalid administrator username or password."
+            );
+
             return;
           }
 
-          localStorage.setItem("adminSession", JSON.stringify(result.data.user));
+          if (!result.data || !result.data.user) {
+            showError("The login response is incomplete.");
+            return;
+          }
+
+          localStorage.setItem(
+            "adminSession",
+            JSON.stringify(result.data.user)
+          );
+
           window.location.href = "/index.html";
         } catch (error) {
-          console.error("Fetch failed:", error);
-          showError("Cannot reach the server.");
+          console.error("Login request failed:", error);
+
+          showError(
+            "Cannot reach the server. Please make sure the Node.js server is running."
+          );
+        } finally {
+          loginButton.disabled = false;
+          loginButton.textContent = "Sign in";
         }
       });
     </script>
