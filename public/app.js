@@ -355,4 +355,40 @@ const eatApi = (() => {
   };
 })();
 
+document.addEventListener("DOMContentLoaded", () => {
+  document.addEventListener("click", (event) => {
+    const link = event.target.closest("a");
+
+    if (!link) return;
+
+    const destination = link.getAttribute("href");
+
+    if (
+      !destination ||
+      destination.startsWith("#") ||
+      destination.startsWith("http://" ) ||
+      destination.startsWith("https://" ) ||
+      destination.startsWith("mailto:") ||
+      destination.startsWith("tel:") ||
+      link.target === "_blank" ||
+      link.hasAttribute("download") ||
+      event.ctrlKey ||
+      event.metaKey ||
+      event.shiftKey ||
+      event.altKey
+    ) {
+      return;
+    }
+
+    event.preventDefault();
+
+    document.body.classList.add("page-leave");
+
+    setTimeout(() => {
+      window.location.href = destination;
+    }, 420);
+  });
+});
+
+
 const system = new AttendanceSystem();
