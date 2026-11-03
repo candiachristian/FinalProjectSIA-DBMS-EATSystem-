@@ -20,30 +20,154 @@ async function getStatusId(conn, name) {
     return rows[0].status_id;
 }
 
+async function getDefaultAdminId(conn) {
+    const [rows] = await conn.execute(
+        `SELECT u.user_id
+           FROM users AS u
+           INNER JOIN roles AS r ON r.role_id = u.role_id
+          WHERE LOWER(r.role_name) = 'admin'
+          ORDER BY u.user_id
+          LIMIT 1`
+    );
+    if (!rows.length) {
+        throw appError('No admin account exists to associate with this registration.', 'ADMIN_NOT_FOUND', 500);
+    }
+    return Number(rows[0].user_id);
+}
+
+async function getOrCreateStudent(conn, studentId, details) {
+    if (studentId !== undefined && studentId !== null && studentId !== '') {
+        const [rows] = await conn.execute(
+            'SELECT student_id FROM students WHERE student_id = ? FOR UPDATE',
+            [studentId]
+        );
+        if (!rows.length) throw appError('Student not found.', 'STUDENT_NOT_FOUND', 404);
+        return Number(rows[0].student_id);
+    }
+
+    if (!details || typeof details !== 'object') {
+        throw appError('Student details are required when no studentId is supplied.', 'VALIDATION', 400);
+    }
+
+    const studentNumber = String(details.studentNumber || '').trim();
+    const firstName = String(details.firstName || '').trim();
+    const middleName = String(details.middleName || '').trim() || null;
+    const lastName = String(details.lastName || '').trim();
+    const departmentName = String(details.departmentName || '').trim();
+    const programName = String(details.programName || '').trim();
+    const yearLevel = Number(details.yearLevel);
+    const section = String(details.section || '').trim();
+
+    if (!studentNumber || studentNumber.length > 40 || !firstName || firstName.length > 80 ||
+        !lastName || lastName.length > 80 || (middleName && middleName.length > 80) ||
+        !departmentName || departmentName.length > 120 || !programName || programName.length > 120 ||
+        !Number.isInteger(yearLevel) || yearLevel < 1 || yearLevel > 5 || !section || section.length > 20) {
+        throw appError('Enter a student ID, full name, department, program, year (1-5), and section using valid lengths.', 'VALIDATION', 400);
+    }
+
+    const [existing] = await conn.execute(
+        `SELECT student_id, first_name, last_name
+           FROM students
+          WHERE student_number = ?
+          LIMIT 1 FOR UPDATE`,
+        [studentNumber]
+    );
+    if (existing.length) {
+        const existingStudent = existing[0];
+        if (existingStudent.first_name.trim().toLowerCase() !== firstName.toLowerCase() ||
+            existingStudent.last_name.trim().toLowerCase() !== lastName.toLowerCase()) {
+            throw appError('This student ID already exists with a different first or last name.', 'STUDENT_DETAILS_MISMATCH', 409);
+        }
+        return Number(existingStudent.student_id);
+    }
+
+    let [departments] = await conn.execute(
+        `SELECT department_id FROM departments
+          WHERE LOWER(TRIM(department_name)) = LOWER(TRIM(?))
+          LIMIT 1`,
+        [departmentName]
+    );
+    let departmentId;
+    if (departments.length) {
+        departmentId = Number(departments[0].department_id);
+    } else {
+        const [departmentResult] = await conn.execute(
+            'INSERT INTO departments (department_name) VALUES (?)',
+            [departmentName]
+        );
+        departmentId = Number(departmentResult.insertId);
+    }
+
+    const [programs] = await conn.execute(
+        `SELECT program_id FROM programs
+          WHERE department_id = ?
+            AND LOWER(TRIM(program_name)) = LOWER(TRIM(?))
+          LIMIT 1`,
+        [departmentId, programName]
+    );
+    let programId;
+    if (programs.length) {
+        programId = Number(programs[0].program_id);
+    } else {
+        const [programResult] = await conn.execute(
+            'INSERT INTO programs (program_name, department_id) VALUES (?, ?)',
+            [programName, departmentId]
+        );
+        programId = Number(programResult.insertId);
+    }
+
+    const [studentResult] = await conn.execute(
+        `INSERT INTO students
+            (student_number, first_name, middle_name, last_name, program_id,
+             year_level, section, email)
+         VALUES (?, ?, ?, ?, ?, ?, ?, NULL)`,
+        [studentNumber, firstName, middleName, lastName, programId, yearLevel, section]
+    );
+    return Number(studentResult.insertId);
+}
+
 async function assertNoOverlap(conn, studentId, eventId, activeStatusId) {
     if (!OVERLAP_CHECK_ENABLED) return;
+
     const [rows] = await conn.execute(
         `SELECT 1
            FROM registration r
-           JOIN events old_e ON old_e.event_id = r.event_id
-           JOIN events new_e ON new_e.event_id = ?
+           JOIN events old_e
+             ON old_e.event_id = r.event_id
+           JOIN events new_e
+             ON new_e.event_id = ?
+           LEFT JOIN attendance a
+             ON a.registration_id = r.registration_id
+           LEFT JOIN attendance_statuses ast
+             ON ast.status_id = a.status_id
           WHERE r.student_id = ?
             AND r.status_id = ?
             AND r.event_id <> new_e.event_id
             AND old_e.event_date = new_e.event_date
             AND old_e.start_time < new_e.end_time
             AND old_e.end_time > new_e.start_time
+            AND (
+                a.attendance_id IS NULL
+                OR ast.status_name = 'Absent'
+            )
           LIMIT 1`,
         [eventId, studentId, activeStatusId]
     );
+
     if (rows.length) {
-        throw appError('Student has another active registration that overlaps this event.', 'REGISTRATION_OVERLAP', 409);
+        throw appError(
+            'Student has another active registration that overlaps this event.',
+            'REGISTRATION_OVERLAP',
+            409
+        );
     }
 }
+
 
 async function getRosterByEvent(eventId) {
     const [rows] = await db.query(
         `SELECT r.registration_id,
+                r.proof_image_path,
                 DATE_FORMAT(r.registered_at, '%Y-%m-%d %H:%i') AS registered_at,
                 s.student_id, s.student_number, s.first_name, s.last_name,
                 s.year_level, s.section,
@@ -133,9 +257,12 @@ async function listEvents() {
     return rows;
 }
 
-async function createRegistration({ studentId, eventId, registeredBy }) {
-    if (studentId == null || eventId == null || registeredBy == null) {
-        throw appError('studentId, eventId, and registeredBy are required.', 'VALIDATION', 400);
+async function createRegistration({ studentId, studentDetails, eventId, registeredBy, proofImagePath }) {
+    if (eventId == null) {
+        throw appError('eventId is required.', 'VALIDATION', 400);
+    }
+    if (!proofImagePath) {
+        throw appError('An event proof image is required.', 'PROOF_REQUIRED', 400);
     }
     const conn = await db.getConnection();
     let started = false;
@@ -143,20 +270,27 @@ async function createRegistration({ studentId, eventId, registeredBy }) {
         await conn.beginTransaction();
         started = true;
 
-        const [students] = await conn.execute(
-            'SELECT student_id FROM students WHERE student_id = ? FOR UPDATE', [studentId]);
-        if (!students.length) throw appError('Student not found.', 'STUDENT_NOT_FOUND', 404);
+        let actorId = registeredBy;
+        if (actorId === undefined || actorId === null || actorId === '') {
+            actorId = await getDefaultAdminId(conn);
+        }
+        if (!Number.isInteger(Number(actorId)) || Number(actorId) <= 0) {
+            throw appError('registeredBy must be a positive integer.', 'VALIDATION', 400);
+        }
+        actorId = Number(actorId);
 
         const [events] = await conn.execute(
             'SELECT event_id FROM events WHERE event_id = ? FOR UPDATE', [eventId]);
         if (!events.length) throw appError('Event not found.', 'EVENT_NOT_FOUND', 404);
 
+        const resolvedStudentId = await getOrCreateStudent(conn, studentId, studentDetails);
+
         const activeId = await getStatusId(conn, 'Registered');
 
         const [existing] = await conn.execute(
-            `SELECT registration_id, status_id
+            `SELECT registration_id, status_id, proof_image_path
                FROM registration WHERE student_id = ? AND event_id = ? FOR UPDATE`,
-            [studentId, eventId]);
+            [resolvedStudentId, eventId]);
 
         if (existing.length) {
             if (existing[0].status_id === activeId) {
@@ -165,25 +299,29 @@ async function createRegistration({ studentId, eventId, registeredBy }) {
             if (!ALLOW_REREGISTER) {
                 throw appError('A cancelled registration already exists for this student and event.', 'REGISTRATION_DUPLICATE', 409);
             }
-            await assertNoOverlap(conn, studentId, eventId, activeId);
+            await assertNoOverlap(conn, resolvedStudentId, eventId, activeId);
             await conn.execute(
-                'UPDATE registration SET status_id = ?, registered_by = ? WHERE registration_id = ?',
-                [activeId, registeredBy, existing[0].registration_id]);
+                `UPDATE registration
+                    SET status_id = ?, registered_by = ?, proof_image_path = ?
+                  WHERE registration_id = ?`,
+                [activeId, actorId, proofImagePath, existing[0].registration_id]);
             await conn.commit(); started = false;
-            return { registrationId: existing[0].registration_id, studentId, eventId,
-                     statusId: activeId, registeredBy, reactivated: true };
+            return { registrationId: existing[0].registration_id, studentId: resolvedStudentId, eventId,
+                     statusId: activeId, registeredBy: actorId, reactivated: true,
+                     oldProofImagePath: existing[0].proof_image_path };
         }
 
-        await assertNoOverlap(conn, studentId, eventId, activeId);
+        await assertNoOverlap(conn, resolvedStudentId, eventId, activeId);
 
         const [result] = await conn.execute(
-            `INSERT INTO registration (student_id, event_id, status_id, registered_by)
-             VALUES (?, ?, ?, ?)`,
-            [studentId, eventId, activeId, registeredBy]);
+            `INSERT INTO registration
+                (student_id, event_id, status_id, registered_by, proof_image_path)
+             VALUES (?, ?, ?, ?, ?)`,
+            [resolvedStudentId, eventId, activeId, actorId, proofImagePath]);
 
         await conn.commit(); started = false;
-        return { registrationId: result.insertId, studentId, eventId,
-                 statusId: activeId, registeredBy };
+        return { registrationId: result.insertId, studentId: resolvedStudentId, eventId,
+                 statusId: activeId, registeredBy: actorId };
     } catch (error) {
         if (started) { try { await conn.rollback(); } catch (_) { /* keep original error */ } }
         if (error && error.code === 'ER_DUP_ENTRY') {
@@ -227,12 +365,19 @@ async function updateStatusByName(registrationId, statusName) {
 
 async function deleteRegistration(registrationId) {
     try {
+        const [rows] = await db.execute(
+            'SELECT proof_image_path FROM registration WHERE registration_id = ?',
+            [registrationId]
+        );
+        if (!rows.length) {
+            throw appError('Registration not found.', 'REGISTRATION_NOT_FOUND', 404);
+        }
         const [result] = await db.query(
             'DELETE FROM registration WHERE registration_id = ?', [registrationId]);
         if (result.affectedRows === 0) {
             throw appError('Registration not found.', 'REGISTRATION_NOT_FOUND', 404);
         }
-        return true;
+        return rows[0].proof_image_path;
     } catch (error) {
         if (error.code === 'ER_ROW_IS_REFERENCED_2') {
             throw appError('Registration has attendance records. Cancel it instead of deleting.', 'REGISTRATION_IN_USE', 409);

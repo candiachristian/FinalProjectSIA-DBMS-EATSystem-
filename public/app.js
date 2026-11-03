@@ -1,20 +1,26 @@
-const $ = id => document.getElementById(id);
+const $ = (id) => document.getElementById(id);
 
-const esc = value =>
-  String(value ?? "").replace(/[&<>"']/g, character => ({
-    "&": "&amp;",
-    "<": "&lt;",
-    ">": "&gt;",
-    '"': "&quot;",
-    "'": "&#39;"
-  })[character]);
+const esc = (value) =>
+  String(value ?? "").replace(
+    /[&<>"']/g,
+    (character) =>
+      ({
+        "&": "&amp;",
+        "<": "&lt;",
+        ">": "&gt;",
+        '"': "&quot;",
+        "'": "&#39;",
+      })[character],
+  );
 
-const toMin = time => {
-  const [hours, minutes] = String(time || "0:0").split(":").map(Number);
+const toMin = (time) => {
+  const [hours, minutes] = String(time || "0:0")
+    .split(":")
+    .map(Number);
   return hours * 60 + minutes;
 };
 
-const fmt12 = time => {
+const fmt12 = (time) => {
   if (!time) return "";
 
   let [hours, minutes] = time.split(":").map(Number);
@@ -25,10 +31,9 @@ const fmt12 = time => {
   return `${hours}:${String(minutes).padStart(2, "0")} ${suffix}`;
 };
 
-const eventDateTime = (event, time) =>
-  new Date(`${event.date}T${time}:00`);
+const eventDateTime = (event, time) => new Date(`${event.date}T${time}:00`);
 
-const eventStatus = event => {
+const eventStatus = (event) => {
   const now = new Date();
   const start = eventDateTime(event, event.start);
   const end = eventDateTime(event, event.end);
@@ -56,57 +61,21 @@ function toast(message) {
   }, 3300);
 }
 
-const TOKEN_KEY = "authToken";
-
-function parseToken(token) {
-  try {
-    const base64 = token.split(".")[1].replace(/-/g, "+").replace(/_/g, "/");
-    return JSON.parse(atob(base64));
-  } catch {
-    return null;
-  }
-}
-
-function getToken() {
-  return localStorage.getItem(TOKEN_KEY);
-}
+const SESSION_KEY = "adminSession";
 
 function getSession() {
-  const token = getToken();
-  const payload = token ? parseToken(token) : null;
-
-  if (!payload || (payload.exp && payload.exp * 1000 < Date.now())) {
-    localStorage.removeItem(TOKEN_KEY);
+  try {
+    return JSON.parse(localStorage.getItem(SESSION_KEY) || "null");
+  } catch {
+    localStorage.removeItem(SESSION_KEY);
     return null;
   }
-
-  return {
-    userId: Number(payload.sub),
-    username: payload.username,
-    role: payload.role
-  };
 }
 
 function logout() {
-  localStorage.removeItem(TOKEN_KEY);
+  localStorage.removeItem(SESSION_KEY);
   localStorage.removeItem("session");
   location.href = "log-in.html";
-}
-
-async function authFetch(url, options = {}) {
-  const response = await fetch(url, {
-    ...options,
-    headers: {
-      ...(options.headers || {}),
-      Authorization: `Bearer ${getToken()}`
-    }
-  });
-
-  if (response.status === 401 || response.status === 403) {
-    logout();
-  }
-
-  return response;
 }
 
 function requireAdmin() {
@@ -115,7 +84,6 @@ function requireAdmin() {
     return false;
   }
 
-  authFetch("/api/auth/me").catch(() => {});
   return true;
 }
 
@@ -137,7 +105,7 @@ class AttendanceSystem {
   }
 
   getEvent(id) {
-    return this.events().find(event => event.id === Number(id)) || null;
+    return this.events().find((event) => event.id === Number(id)) || null;
   }
 
   save(events) {
@@ -147,7 +115,7 @@ class AttendanceSystem {
     } catch {
       alert(
         "Browser storage is full. Use a smaller photo (under 1 MB) " +
-        "or clear older event data."
+          "or clear older event data.",
       );
       return false;
     }
@@ -176,7 +144,7 @@ class AttendanceSystem {
       end,
       venue,
       grace: Number(grace) || 0,
-      attendees: []
+      attendees: [],
     });
 
     return this.save(events);
@@ -186,15 +154,16 @@ class AttendanceSystem {
     const currentStart = eventDateTime(currentEvent, currentEvent.start);
     const currentEnd = eventDateTime(currentEvent, currentEvent.end);
 
-    return events.find(event =>
-      event.id !== currentEvent.id &&
-      event.date === currentEvent.date &&
-      event.attendees?.some(
-        attendee =>
-          attendee.studentId.toLowerCase() === studentId.toLowerCase()
-      ) &&
-      currentStart < eventDateTime(event, event.end) &&
-      currentEnd > eventDateTime(event, event.start)
+    return events.find(
+      (event) =>
+        event.id !== currentEvent.id &&
+        event.date === currentEvent.date &&
+        event.attendees?.some(
+          (attendee) =>
+            attendee.studentId.toLowerCase() === studentId.toLowerCase(),
+        ) &&
+        currentStart < eventDateTime(event, event.end) &&
+        currentEnd > eventDateTime(event, event.start),
     );
   }
 
@@ -209,7 +178,7 @@ class AttendanceSystem {
 
   registerStudent(eventId, student, proof) {
     const events = this.events();
-    const event = events.find(item => item.id === Number(eventId));
+    const event = events.find((item) => item.id === Number(eventId));
 
     if (!event) {
       alert("Select a valid event.");
@@ -219,7 +188,7 @@ class AttendanceSystem {
     if (!this.canRegister(event)) {
       alert(
         `Student registration is available only during the event ` +
-        `(${fmt12(event.start)}–${fmt12(event.end)}).`
+          `(${fmt12(event.start)}–${fmt12(event.end)}).`,
       );
       return false;
     }
@@ -235,8 +204,8 @@ class AttendanceSystem {
     }
 
     const duplicate = event.attendees.some(
-      attendee =>
-        attendee.studentId.toLowerCase() === student.studentId.toLowerCase()
+      (attendee) =>
+        attendee.studentId.toLowerCase() === student.studentId.toLowerCase(),
     );
 
     if (duplicate) {
@@ -249,7 +218,7 @@ class AttendanceSystem {
     if (conflict) {
       alert(
         `Schedule conflict with ${conflict.name} ` +
-        `(${fmt12(conflict.start)}–${fmt12(conflict.end)}).`
+          `(${fmt12(conflict.start)}–${fmt12(conflict.end)}).`,
       );
       return false;
     }
@@ -257,7 +226,7 @@ class AttendanceSystem {
     event.attendees.push({
       ...student,
       timeIn: new Date().toTimeString().slice(0, 5),
-      proof
+      proof,
     });
 
     return this.save(events);
@@ -265,9 +234,7 @@ class AttendanceSystem {
 
   attendeeStatus(event, attendee) {
     if (!attendee.timeIn) {
-      return eventStatus(event) === "Completed"
-        ? "Absent"
-        : "Registered";
+      return eventStatus(event) === "Completed" ? "Absent" : "Registered";
     }
 
     return toMin(attendee.timeIn) <=
@@ -281,10 +248,10 @@ class AttendanceSystem {
       Present: 0,
       Late: 0,
       Absent: 0,
-      Registered: 0
+      Registered: 0,
     };
 
-    event.attendees.forEach(attendee => {
+    event.attendees.forEach((attendee) => {
       counts[this.attendeeStatus(event, attendee)]++;
     });
 
@@ -293,12 +260,12 @@ class AttendanceSystem {
 
   deleteAttendee(eventId, studentId) {
     const events = this.events();
-    const event = events.find(item => item.id === Number(eventId));
+    const event = events.find((item) => item.id === Number(eventId));
 
     if (!event) return false;
 
     event.attendees = event.attendees.filter(
-      attendee => attendee.studentId !== studentId
+      (attendee) => attendee.studentId !== studentId,
     );
 
     return this.save(events);
@@ -306,7 +273,7 @@ class AttendanceSystem {
 
   deleteEvent(eventId) {
     const events = this.events().filter(
-      event => event.id !== Number(eventId)
+      (event) => event.id !== Number(eventId),
     );
 
     return this.save(events);
@@ -315,33 +282,113 @@ class AttendanceSystem {
 
 const eatApi = (() => {
   async function request(url, options = {}) {
-    const res = await authFetch(url, { ...options, headers: { 'Content-Type': 'application/json' } });
+    const headers = { ...(options.headers || {}) };
+    if (!(options.body instanceof FormData)) {
+      headers["Content-Type"] = "application/json";
+    }
+    const res = await fetch(url, {
+      ...options,
+      headers,
+    });
+
     const body = await res.json().catch(() => ({}));
-    if (!res.ok) throw new Error(body.message || 'Request failed');
+    if (!res.ok) throw new Error(body.message || "Request failed");
     return body.data !== undefined ? body.data : body;
   }
-  const send = (method, url, payload) => request(url, { method, body: JSON.stringify(payload || {}) });
+  const send = (method, url, payload) =>
+    request(url, { method, body: JSON.stringify(payload || {}) });
 
   return {
-    events: () => request('/api/registrations/lookup/events'),
-    roster: (eventId) => request('/api/attendance?eventId=' + encodeURIComponent(eventId)),
+    events: () => request("/api/registrations/lookup/events"),
+
+    departments: () => request("/api/departments"),
+
+    programs: (departmentId) =>
+      request("/api/programs?departmentId=" + encodeURIComponent(departmentId)),
+
+    roster: (eventId) =>
+      request("/api/attendance?eventId=" + encodeURIComponent(eventId)),
 
     findStudentByNumber: async (number) => {
-      const list = await request('/api/registrations/lookup/students?search=' + encodeURIComponent(number));
+      const list = await request(
+        "/api/registrations/lookup/students?search=" +
+          encodeURIComponent(number),
+      );
       return list.find((s) => s.student_number === number) || null;
     },
 
-    register: (studentId, eventId) => send('POST', '/api/registrations', { studentId, eventId }),
-    removeRegistration: (registrationId) => request('/api/registrations/' + registrationId, { method: 'DELETE' }),
+    register: (studentOrId, eventId, proofFile) => {
+      const formData = new FormData();
+      formData.append("eventId", String(eventId));
+      if (studentOrId && typeof studentOrId === "object") {
+        Object.entries(studentOrId).forEach(([key, value]) => {
+          if (value !== undefined && value !== null) {
+            formData.append(key, String(value));
+          }
+        });
+      } else {
+        formData.append("studentId", String(studentOrId));
+      }
+      formData.append("proof", proofFile);
+      return request("/api/registrations", {
+        method: "POST",
+        body: formData,
+      });
+    },
+    removeRegistration: (registrationId) =>
+      request("/api/registrations/" + registrationId, { method: "DELETE" }),
 
     setRegistrationStatus: (registrationId, status) =>
-      send('PUT', '/api/registrations/' + registrationId + '/status', { status }),
-    registrationStatuses: () => request('/api/registration-statuses'),
+      send("PUT", "/api/registrations/" + registrationId + "/status", {
+        status,
+      }),
+    registrationStatuses: () => request("/api/registration-statuses"),
 
     recordAttendance: (registrationId, status) =>
-      send('POST', '/api/attendance', status ? { registrationId, status } : { registrationId }),
-    editAttendance: (attendanceId, payload) => send('PUT', '/api/attendance/' + attendanceId, payload),
+      send(
+        "POST",
+        "/api/attendance",
+        status ? { registrationId, status } : { registrationId },
+      ),
+    editAttendance: (attendanceId, payload) =>
+      send("PUT", "/api/attendance/" + attendanceId, payload),
   };
 })();
+
+document.addEventListener("DOMContentLoaded", () => {
+  document.addEventListener("click", (event) => {
+    const link = event.target.closest("a");
+
+    if (!link) return;
+
+    const destination = link.getAttribute("href");
+
+    if (
+      !destination ||
+      destination.startsWith("#") ||
+      destination.startsWith("http://" ) ||
+      destination.startsWith("https://" ) ||
+      destination.startsWith("mailto:") ||
+      destination.startsWith("tel:") ||
+      link.target === "_blank" ||
+      link.hasAttribute("download") ||
+      event.ctrlKey ||
+      event.metaKey ||
+      event.shiftKey ||
+      event.altKey
+    ) {
+      return;
+    }
+
+    event.preventDefault();
+
+    document.body.classList.add("page-leave");
+
+    setTimeout(() => {
+      window.location.href = destination;
+    }, 420);
+  });
+});
+
 
 const system = new AttendanceSystem();

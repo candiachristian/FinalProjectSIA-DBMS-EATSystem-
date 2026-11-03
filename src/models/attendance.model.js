@@ -29,6 +29,7 @@ function normalizeTimeIn(value) {
 async function getEventAttendance(eventId) {
     const [rows] = await db.query(
         `SELECT r.registration_id,
+                r.proof_image_path,
                 a.attendance_id,
                 s.student_id, s.student_number, s.first_name, s.last_name,
                 s.year_level, s.section,
@@ -59,7 +60,6 @@ async function getEventAttendance(eventId) {
 
 async function recordAttendance({ registrationId, statusName, timeIn, recordedBy }) {
     if (!Number.isInteger(registrationId) || registrationId <= 0) throw appError('registrationId must be a positive integer.', 'VALIDATION', 400);
-    if (!Number.isInteger(recordedBy) || recordedBy <= 0) throw appError('recordedBy must be a positive integer.', 'VALIDATION', 400);
     if (statusName !== undefined && !VALID_STATUSES.includes(statusName)) {
         throw appError('status must be Present, Late or Absent.', 'VALIDATION', 400);
     }
