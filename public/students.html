@@ -1,0 +1,407 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>Student Management</title>
+
+    <link rel="stylesheet" href="style.css" />
+    <script src="app.js"></script>
+  </head>
+
+  <body>
+    <header>
+      <div class="brand">
+        <span class="brand-mark">🎓</span>
+        <h1>Student Management</h1>
+      </div>
+
+      <a href="index.html" style="color: white">
+        Dashboard
+      </a>
+    </header>
+
+    <main class="wrap">
+      <section class="hero">
+        <h2>Student records</h2>
+        <p>
+          Register each student once and reuse the same student ID for events.
+        </p>
+      </section>
+
+      <section class="panel">
+        <div class="title-row">
+          <div>
+            <h2>Register new student</h2>
+            <p class="hint">
+              Do not register the same student ID more than once.
+            </p>
+          </div>
+
+          <a class="button secondary" href="attendance.html">
+            Go to attendance
+          </a>
+        </div>
+
+        <form id="student-form">
+          <div class="row">
+            <div>
+              <label for="student-number">Student ID *</label>
+
+              <input
+                id="student-number"
+                required
+                maxlength="40"
+                placeholder="e.g. 2025-12345"
+              />
+            </div>
+
+            <div>
+              <label for="email">Email *</label>
+
+              <input
+                id="email"
+                type="email"
+                required
+                maxlength="254"
+                placeholder="student@example.com"
+              />
+            </div>
+          </div>
+
+          <div class="row">
+            <div>
+              <label for="first-name">First name *</label>
+              <input id="first-name" required maxlength="80" />
+            </div>
+
+            <div>
+              <label for="middle-name">Middle name</label>
+              <input id="middle-name" maxlength="80" />
+            </div>
+
+            <div>
+              <label for="last-name">Last name *</label>
+              <input id="last-name" required maxlength="80" />
+            </div>
+          </div>
+
+          <div class="row">
+            <div>
+              <label for="program-id">Program ID *</label>
+
+              <input
+                id="program-id"
+                type="number"
+                min="1"
+                required
+                placeholder="Example: 1"
+              />
+
+              <p class="hint">
+                Enter the program_id from the programs table.
+              </p>
+            </div>
+
+            <div>
+              <label for="year-level">Year level *</label>
+
+              <select id="year-level" required>
+                <option value="">Choose year</option>
+                <option value="1">1st Year</option>
+                <option value="2">2nd Year</option>
+                <option value="3">3rd Year</option>
+                <option value="4">4th Year</option>
+                <option value="5">5th Year</option>
+              </select>
+            </div>
+
+            <div>
+              <label for="section">Section *</label>
+
+              <input
+                id="section"
+                required
+                maxlength="20"
+                placeholder="A"
+              />
+            </div>
+          </div>
+
+          <div class="actions">
+            <button id="save-student" type="submit">
+              Save student
+            </button>
+
+            <button id="clear-form" class="secondary" type="button">
+              Clear
+            </button>
+          </div>
+        </form>
+
+        <p id="student-message" class="notice hidden"></p>
+      </section>
+
+      <section class="panel">
+        <div class="title-row">
+          <div>
+            <h2>Existing students</h2>
+
+            <p class="hint">
+              Search before creating a new student record.
+            </p>
+          </div>
+
+          <div class="row" style="max-width: 520px">
+            <input
+              id="search-students"
+              placeholder="Search student..."
+            />
+
+            <button id="search-button" type="button">
+              Search
+            </button>
+          </div>
+        </div>
+
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Student ID</th>
+                <th>Name</th>
+                <th>Program</th>
+                <th>Department</th>
+                <th>Year</th>
+                <th>Section</th>
+                <th>Email</th>
+              </tr>
+            </thead>
+
+            <tbody id="student-list">
+              <tr>
+                <td colspan="7">
+                  Loading students...
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+    </main>
+
+    <script>
+      requireAdmin();
+
+      const form = document.getElementById("student-form");
+      const message = document.getElementById("student-message");
+      const studentList = document.getElementById("student-list");
+      const saveButton = document.getElementById("save-student");
+      const searchInput = document.getElementById("search-students");
+
+      const escapeHtml = (value) =>
+        String(value ?? "").replace(
+          /[&<>"']/g,
+          (character) =>
+            ({
+              "&": "&amp;",
+              "<": "&lt;",
+              ">": "&gt;",
+              '"': "&quot;",
+              "'": "&#39;"
+            })[character]
+        );
+
+      async function request(url, options = {}) {
+        const response = await fetch(url, {
+          ...options,
+          headers: {
+            "Content-Type": "application/json",
+            ...(options.headers || {})
+          }
+        });
+
+        const body = await response.json().catch(() => ({}));
+
+        if (!response.ok) {
+          throw new Error(body.message || "Request failed.");
+        }
+
+        return body.data !== undefined ? body.data : body;
+      }
+
+      function showMessage(text, type = "") {
+        message.textContent = text;
+        message.className = `notice ${type}`.trim();
+      }
+
+      function clearMessage() {
+        message.textContent = "";
+        message.className = "notice hidden";
+      }
+
+      function renderStudents(students) {
+        if (!students.length) {
+          studentList.innerHTML =
+            '<tr><td colspan="7" class="empty">No students found.</td></tr>';
+
+          return;
+        }
+
+        studentList.innerHTML = students
+          .map(
+            (student) => `
+              <tr>
+                <td>${escapeHtml(student.student_number)}</td>
+
+                <td>
+                  ${escapeHtml(
+                    [
+                      student.first_name,
+                      student.middle_name,
+                      student.last_name
+                    ]
+                      .filter(Boolean)
+                      .join(" ")
+                  )}
+                </td>
+
+                <td>
+                  ${escapeHtml(student.program_name)}
+                </td>
+
+                <td>
+                  ${escapeHtml(student.department_name)}
+                </td>
+
+                <td>
+                  ${escapeHtml(student.year_level)}
+                </td>
+
+                <td>
+                  ${escapeHtml(student.section)}
+                </td>
+
+                <td>
+                  ${escapeHtml(student.email)}
+                </td>
+              </tr>
+            `
+          )
+          .join("");
+      }
+
+      async function loadStudents() {
+        try {
+          const search = searchInput.value.trim();
+
+          const url = search
+            ? `/api/students?search=${encodeURIComponent(search)}`
+            : "/api/students";
+
+          const students = await request(url);
+
+          renderStudents(students);
+        } catch (error) {
+          studentList.innerHTML = `
+            <tr>
+              <td colspan="7">
+                ${escapeHtml(error.message)}
+              </td>
+            </tr>
+          `;
+        }
+      }
+
+      form.addEventListener("submit", async (event) => {
+        event.preventDefault();
+
+        clearMessage();
+
+        saveButton.disabled = true;
+        saveButton.textContent = "Saving...";
+
+        const payload = {
+          studentNumber: document
+            .getElementById("student-number")
+            .value
+            .trim(),
+
+          firstName: document
+            .getElementById("first-name")
+            .value
+            .trim(),
+
+          middleName: document
+            .getElementById("middle-name")
+            .value
+            .trim(),
+
+          lastName: document
+            .getElementById("last-name")
+            .value
+            .trim(),
+
+          programId: Number(
+            document.getElementById("program-id").value
+          ),
+
+          yearLevel: Number(
+            document.getElementById("year-level").value
+          ),
+
+          section: document
+            .getElementById("section")
+            .value
+            .trim(),
+
+          email: document
+            .getElementById("email")
+            .value
+            .trim()
+        };
+
+        try {
+          await request("/api/students", {
+            method: "POST",
+            body: JSON.stringify(payload)
+          });
+
+          showMessage(
+            "Student saved successfully. You can now register this student for events."
+          );
+
+          form.reset();
+
+          await loadStudents();
+        } catch (error) {
+          showMessage(error.message, "error");
+        } finally {
+          saveButton.disabled = false;
+          saveButton.textContent = "Save student";
+        }
+      });
+
+      document
+        .getElementById("clear-form")
+        .addEventListener("click", () => {
+          form.reset();
+          clearMessage();
+        });
+
+      document
+        .getElementById("search-button")
+        .addEventListener("click", loadStudents);
+
+      searchInput.addEventListener("keydown", (event) => {
+        if (event.key === "Enter") {
+          event.preventDefault();
+          loadStudents();
+        }
+      });
+
+      loadStudents();
+    </script>
+  </body>
+</html>
