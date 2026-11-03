@@ -128,24 +128,41 @@ async function getOrCreateStudent(conn, studentId, details) {
 
 async function assertNoOverlap(conn, studentId, eventId, activeStatusId) {
     if (!OVERLAP_CHECK_ENABLED) return;
+
     const [rows] = await conn.execute(
         `SELECT 1
            FROM registration r
-           JOIN events old_e ON old_e.event_id = r.event_id
-           JOIN events new_e ON new_e.event_id = ?
+           JOIN events old_e
+             ON old_e.event_id = r.event_id
+           JOIN events new_e
+             ON new_e.event_id = ?
+           LEFT JOIN attendance a
+             ON a.registration_id = r.registration_id
+           LEFT JOIN attendance_statuses ast
+             ON ast.status_id = a.status_id
           WHERE r.student_id = ?
             AND r.status_id = ?
             AND r.event_id <> new_e.event_id
             AND old_e.event_date = new_e.event_date
             AND old_e.start_time < new_e.end_time
             AND old_e.end_time > new_e.start_time
+            AND (
+                a.attendance_id IS NULL
+                OR ast.status_name = 'Absent'
+            )
           LIMIT 1`,
         [eventId, studentId, activeStatusId]
     );
+
     if (rows.length) {
-        throw appError('Student has another active registration that overlaps this event.', 'REGISTRATION_OVERLAP', 409);
+        throw appError(
+            'Student has another active registration that overlaps this event.',
+            'REGISTRATION_OVERLAP',
+            409
+        );
     }
 }
+
 
 async function getRosterByEvent(eventId) {
     const [rows] = await db.query(
