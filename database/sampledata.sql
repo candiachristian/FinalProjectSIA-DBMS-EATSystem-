@@ -90,6 +90,16 @@ INSERT IGNORE INTO programs (program_name, department_id)
 SELECT 'BS Civil Engineering', department_id
 FROM departments
 WHERE department_name = 'College of Engineering';
+
+INSERT IGNORE INTO programs (program_name, department_id)
+SELECT 'Bachelor of Physical Education', department_id
+FROM departments
+WHERE department_name = 'College of Education';
+
+INSERT IGNORE INTO programs (program_name, department_id)
+SELECT 'Bachelor of Educational Technology', department_id
+FROM departments
+WHERE department_name = 'College of Education';
  
 INSERT INTO students
     (student_number, first_name, middle_name, last_name, program_id,
