@@ -1,0 +1,318 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>Manage Events</title>
+
+    <link rel="stylesheet" href="style.css" />
+    <script src="app.js"></script>
+  </head>
+
+  <body>
+    <header>
+      <div class="brand">
+        <span class="brand-mark">📝</span>
+        <h1>Manage events</h1>
+      </div>
+
+      <a href="index.html" style="color: white">Dashboard</a>
+    </header>
+
+    <main class="wrap">
+      <div class="title-row">
+        <h2>All events</h2>
+
+        <a class="button" href="add-event.html"> ＋ Add event </a>
+      </div>
+
+      <section id="event-list" class="grid" aria-live="polite"></section>
+    </main>
+
+    <script>
+      requireAdmin();
+
+      const list = $("event-list");
+
+      function escapeHtml(value) {
+        return String(value ?? "").replace(
+          /[&<>"']/g,
+          (character) =>
+            ({
+              "&": "&amp;",
+              "<": "&lt;",
+              ">": "&gt;",
+              '"': "&quot;",
+              "'": "&#39;",
+            })[character],
+        );
+      }
+
+      function formatTime(value) {
+        if (!value) return "";
+        const [hourText, minuteText] = String(value).split(":");
+        const hour = Number(hourText);
+        const suffix = hour >= 12 ? "PM" : "AM";
+        const displayHour = hour % 12 || 12;
+        return `${displayHour}:${minuteText || "00"} ${suffix}`;
+      }
+
+      async function getRegistrationCount(eventId) {
+        try {
+          const response = await fetch(
+            `/api/registrations?eventId=${encodeURIComponent(eventId)}`,
+          );
+          const result = await response.json();
+
+          if (!response.ok || !result.success) return 0;
+          return Array.isArray(result.data) ? result.data.length : 0;
+        } catch (error) {
+          console.error(
+            `Could not load registrations for event ${eventId}:`,
+            error,
+          );
+          return 0;
+        }
+      }
+
+      async function renderEvents() {
+        list.innerHTML = '<div class="panel">Loading events…</div>';
+
+        try {
+          const response = await fetch("/api/events");
+          const result = await response.json();
+
+          if (!response.ok || !result.success) {
+            throw new Error(result.message || "Could not load events.");
+          }
+
+          const events = Array.isArray(result.data) ? result.data : [];
+
+          if (events.length === 0) {
+            list.innerHTML = `
+          <div class="panel empty">
+            No events yet. Add your first event.
+          </div>
+        `;
+            return;
+          }
+
+          const eventsWithCounts = await Promise.all(
+            events.map(async (event) => ({
+              ...event,
+              registrationCount: await getRegistrationCount(event.event_id),
+            })),
+          );
+
+          list.innerHTML = eventsWithCounts
+            .map((event) => {
+              const eventId = Number(event.event_id);
+              const eventName = event.event_name;
+              const eventDate = event.event_date;
+              const startTime = event.start_time;
+              const endTime = event.end_time;
+              const venueName = event.venue_name || event.venue || "";
+              const gracePeriod =
+                event.grace_period_minutes ??
+                event.grace_period ??
+                event.grace ??
+                0;
+
+              const eventForStatus = {
+                id: eventId,
+                name: eventName,
+                date: eventDate,
+                start: startTime,
+                end: endTime,
+              };
+
+              let statusLabel = "Scheduled";
+              try {
+                if (typeof eventStatus === "function") {
+                  statusLabel = eventStatus(eventForStatus);
+                }
+              } catch (error) {
+                console.warn("Could not calculate event status:", error);
+              }
+
+              return `
+          <article class="panel">
+            <div class="title-row">
+              <h3>${escapeHtml(eventName)}</h3>
+              <span class="badge">${escapeHtml(statusLabel)}</span>
+            </div>
+
+            <p><strong>Date:</strong> ${escapeHtml(String(event.event_date).slice(0, 10))}</p>
+
+            <p>
+              <strong>Time:</strong>
+              ${escapeHtml(formatTime(startTime))}–${escapeHtml(formatTime(endTime))}
+            </p>
+            <p><strong>Venue:</strong> ${escapeHtml(venueName)}</p>
+            <p>
+              <strong>Grace period:</strong>
+              ${Number(gracePeriod) || 0} minutes
+            </p>
+            <p>
+              <strong>Registered students:</strong>
+              ${event.registrationCount}
+            </p>
+
+            <div class="actions">
+              <a class="button" href="attendance.html?event=${eventId}">
+                Open attendance
+              </a>
+
+              <button type="button" onclick="editEvent(${eventId})">
+                Edit event
+              </button>
+
+              <button
+                class="danger"
+                type="button"
+                onclick="deleteEvent(${eventId})"
+              >
+                Delete event
+              </button>
+            </div>
+          </article>
+        `;
+            })
+            .join("");
+        } catch (error) {
+          console.error("Could not load events:", error);
+          list.innerHTML = `
+        <div class="panel empty">
+          Could not load events. Check the events API and try again.
+        </div>
+      `;
+        }
+      }
+
+      async function editEvent(eventId) {
+        try {
+          const getResponse = await fetch(`/api/events/${eventId}`);
+          const getResult = await getResponse.json();
+
+          if (!getResponse.ok || !getResult.success) {
+            throw new Error(
+              getResult.message || "Could not load event details.",
+            );
+          }
+
+          const event = getResult.data;
+
+          const eventName = prompt("Event name:", event.event_name);
+          if (eventName === null) return;
+
+          const rawDate = event.event_date;
+          const dateForInput = /^\d{4}-\d{2}-\d{2}$/.test(String(rawDate))
+            ? String(rawDate)
+            : (() => {
+                const date = new Date(rawDate);
+                return [
+                  date.getFullYear(),
+                  String(date.getMonth() + 1).padStart(2, "0"),
+                  String(date.getDate()).padStart(2, "0"),
+                ].join("-");
+              })();
+
+          const eventDate = prompt("Event date (YYYY-MM-DD):", dateForInput);
+
+          if (eventDate === null) return;
+
+          const startTime = prompt(
+            "Start time (HH:MM):",
+            String(event.start_time).slice(0, 5),
+          );
+          if (startTime === null) return;
+
+          const endTime = prompt(
+            "End time (HH:MM):",
+            String(event.end_time).slice(0, 5),
+          );
+          if (endTime === null) return;
+
+          const venueName = prompt("Venue name:", event.venue || "");
+          if (venueName === null) return;
+
+          const categoryId = prompt(
+            "Category ID (current category: " +
+              (event.category_name || "unknown") +
+              "):",
+            String(event.category_id),
+          );
+          if (categoryId === null) return;
+
+          const gracePeriodMinutes = prompt(
+            "Grace period in minutes:",
+            String(event.grace_period_minutes ?? 15),
+          );
+          if (gracePeriodMinutes === null) return;
+
+          const payload = {
+            eventName: eventName.trim(),
+            eventDate: eventDate.trim(),
+            startTime: startTime.trim(),
+            endTime: endTime.trim(),
+            venue: venueName.trim(),
+            categoryId: Number(categoryId),
+            gracePeriodMinutes: Number(gracePeriodMinutes),
+            termId: event.term_id ?? null,
+          };
+
+          const response = await fetch(`/api/events/${eventId}`, {
+            method: "PUT",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify(payload),
+          });
+
+          const result = await response.json();
+
+          if (!response.ok || !result.success) {
+            throw new Error(result.message || "Could not update event.");
+          }
+
+          toast("Event updated.");
+          await renderEvents();
+        } catch (error) {
+          console.error("Edit event failed:", error);
+          alert(error.message || "Could not update event.");
+        }
+      }
+
+      async function deleteEvent(eventId) {
+        const confirmed = confirm(
+          "Delete this event and all associated attendance records?",
+        );
+
+        if (!confirmed) return;
+
+        try {
+          const response = await fetch(`/api/events/${eventId}`, {
+            method: "DELETE",
+          });
+          const result = await response.json();
+
+          if (!response.ok || !result.success) {
+            throw new Error(result.message || "Could not delete event.");
+          }
+
+          if (typeof toast === "function") {
+            toast("Event deleted.");
+          }
+
+          await renderEvents();
+        } catch (error) {
+          console.error("Delete event request failed:", error);
+          alert(error.message || "Could not delete event.");
+        }
+      }
+
+      renderEvents();
+    </script>
+  </body>
+</html>
