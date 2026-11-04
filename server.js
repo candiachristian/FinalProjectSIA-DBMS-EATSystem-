@@ -11,8 +11,6 @@ const reportRoutes = require('./src/routes/report.routes');
 const eventRoutes = require('./src/routes/event.routes');
 const eventCategoryRoutes = require('./src/routes/eventCategory.routes');
 const departmentRoutes = require('./src/routes/department.routes');
-
-
 const programRoutes = require('./src/routes/program.routes');
 
 const app = express();
@@ -29,8 +27,6 @@ app.use('/api/reports', reportRoutes);
 app.use('/api/events', eventRoutes);
 app.use('/api/event-categories', eventCategoryRoutes);
 app.use('/api/departments', departmentRoutes);
-
-
 app.use('/api/programs', programRoutes);
 
 app.use(express.static(path.join(__dirname, 'public')));
