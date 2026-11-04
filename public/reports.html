@@ -132,6 +132,7 @@
                   <th>Program / year / section</th>
                   <th>Time in</th>
                   <th>Attendance status</th>
+                  <th>Notes</th>
                   <th>Registration status</th>
                   <th>Proof</th>
                 </tr>
@@ -150,11 +151,12 @@
                       <td>${esc([row.program_name, row.year_level, row.section].filter(Boolean).join(' / '))}</td>
                       <td>${timeLabel(row.time_in)}</td>
                       <td>${esc(row.attendance_status || 'Not recorded')}</td>
+                      <td>${esc(row.notes || '—')}</td>
                       <td>${esc(row.registration_status || '')}</td>
                       <td>${proof}</td>
                     </tr>
                   `;
-                }).join('') : '<tr><td colspan="9">No matching students.</td></tr>'}
+                }).join('') : '<tr><td colspan="10">No matching students.</td></tr>'}
               </tbody>
             </table>
           </div>
