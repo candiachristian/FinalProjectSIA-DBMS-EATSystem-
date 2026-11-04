@@ -2,8 +2,13 @@
 <html lang="en">
   <head>
     <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1"
+    />
+
     <title>Attendance</title>
+
     <link rel="stylesheet" href="style.css" />
     <script src="app.js"></script>
   </head>
@@ -15,7 +20,9 @@
         <h1>Attendance &amp; student registration</h1>
       </div>
 
-      <a href="index.html" style="color: white">Dashboard</a>
+      <a href="index.html" style="color: white">
+        Dashboard
+      </a>
     </header>
 
     <main class="wrap">
@@ -58,14 +65,19 @@
             $("event").insertAdjacentHTML(
               "beforeend",
               `<option value="${event.event_id}">
-                ${esc(event.event_name)} ·
-                ${esc(String(event.event_date).slice(0, 10))} ·
+                ${esc(event.event_name)}
+                ·
+                ${esc(String(event.event_date).slice(0, 10))}
+                ·
                 ${fmt12(event.start_time)}
               </option>`
             );
           });
 
-          if (requestedEventId && events[requestedEventId]) {
+          if (
+            requestedEventId &&
+            events[requestedEventId]
+          ) {
             $("event").value = requestedEventId;
           }
         }
@@ -79,13 +91,19 @@
 
           if (row.attendance_id === null) {
             actions.push(
-              `<button data-act="record" data-reg="${row.registration_id}">
+              `<button
+                data-act="record"
+                data-reg="${row.registration_id}"
+              >
                 Record time-in
               </button>`
             );
 
             actions.push(
-              `<button data-act="absent" data-reg="${row.registration_id}">
+              `<button
+                data-act="absent"
+                data-reg="${row.registration_id}"
+              >
                 Absent
               </button>`
             );
@@ -99,14 +117,28 @@
                 Edit
               </button>`
             );
+            actions.push(
+              `<button
+                data-act="note"
+                data-att="${row.attendance_id}"
+              >
+                Add note
+              </button>`
+            );
           }
 
           actions.push(
             row.registration_status === "Registered"
-              ? `<button data-act="cancel" data-reg="${row.registration_id}">
+              ? `<button
+                  data-act="cancel"
+                  data-reg="${row.registration_id}"
+                >
                   Cancel registration
                 </button>`
-              : `<button data-act="reregister" data-reg="${row.registration_id}">
+              : `<button
+                  data-act="reregister"
+                  data-reg="${row.registration_id}"
+                >
                   Re-register
                 </button>`
           );
@@ -135,9 +167,20 @@
               </a>`
             : "—";
 
+          const notes = (row.notes || []).length
+            ? row.notes
+                .map(
+                  (note) =>
+                    `<div><strong>${esc(note.added_by_username || "Admin")}:</strong> ${esc(note.note_text)}</div>`
+                )
+                .join("")
+            : "—";
+
           return `
             <tr>
-              <td>${esc(row.student_number || "")}</td>
+              <td>
+                ${esc(row.student_number || "")}
+              </td>
 
               <td>
                 ${esc(row.first_name || "")}
@@ -151,14 +194,20 @@
               <td>
                 ${esc(row.program_name || "")}
                 ${esc(
-                  [row.year_level, row.section]
+                  [
+                    row.year_level,
+                    row.section
+                  ]
                     .filter(Boolean)
                     .join(" - ")
                 )}
               </td>
 
               <td>${timeIn}</td>
+
               <td>${proofLink}</td>
+
+              <td>${notes}</td>
 
               <td>
                 <span class="badge ${esc(attendanceStatus)}">
@@ -167,12 +216,18 @@
               </td>
 
               <td>
-                <span class="badge ${esc(row.registration_status || "")}">
+                <span
+                  class="badge ${esc(
+                    row.registration_status || ""
+                  )}"
+                >
                   ${esc(row.registration_status || "")}
                 </span>
               </td>
 
-              <td>${actions.join(" ")}</td>
+              <td>
+                ${actions.join(" ")}
+              </td>
             </tr>
           `;
         }
@@ -197,19 +252,24 @@
 
           const countStatus = (status) =>
             rows.filter(
-              (row) => row.attendance_status === status
+              (row) =>
+                row.attendance_status === status
             ).length;
 
           const stats = {
             Registered: rows.filter(
-              (row) => row.registration_status === "Registered"
+              (row) =>
+                row.registration_status === "Registered"
             ).length,
+
             Present: countStatus("Present"),
             Late: countStatus("Late"),
             Absent: countStatus("Absent")
           };
 
-          const registrationOpen = system.canRegister(asLocal(event));
+          const registrationOpen =
+            system.canRegister(asLocal(event));
+
           const phase = eventStatus(asLocal(event));
 
           $("content").innerHTML = `
@@ -231,24 +291,42 @@
             >
               <div class="title-row">
                 <div>
-                  <h3>Register a student to this event</h3>
+                  <h3>Register a student</h3>
 
                   <p class="hint">
-                    Search for an existing student by ID and attach photo
-                    proof. The student can register for multiple events as
-                    long as the schedules do not overlap.
+                    Enter the student's details and attach photo proof.
+                    Registration is allowed only while this event is in progress.
                   </p>
                 </div>
 
-                <span class="badge ${registrationOpen ? "Ongoing" : phase}">
-                  ${registrationOpen ? "Registration open" : phase}
+                <span
+                  class="badge ${
+                    registrationOpen
+                      ? "Ongoing"
+                      : phase
+                  }"
+                >
+                  ${
+                    registrationOpen
+                      ? "Registration open"
+                      : phase
+                  }
                 </span>
               </div>
 
               ${
                 registrationOpen
                   ? `
-                    <form id="reg-form" enctype="multipart/form-data">
+                    <form
+                      id="reg-form"
+                      enctype="multipart/form-data"
+                    >
+                      <div
+                        id="registration-warning"
+                        class="notice warn hidden"
+                        style="margin-bottom: 14px"
+                      ></div>
+
                       <label for="sid">
                         Existing student ID *
                       </label>
@@ -275,8 +353,8 @@
                       ></div>
 
                       <p class="hint">
-                        Use a student already saved in Student Management.
-                        The student information will be reused for this event.
+                        Use a student already saved in the Student Management
+                        section. The student information will be reused for this event.
                       </p>
 
                       <label for="proof">
@@ -292,8 +370,7 @@
                       />
 
                       <p class="hint">
-                        Image file up to 1 MB. The photo is stored with this
-                        event registration.
+                        Image file up to 1 MB. The photo is stored with this event registration.
                       </p>
 
                       <div class="actions">
@@ -315,7 +392,9 @@
                       Student registration opens at
                       ${fmt12(event.start_time)}
                       on
-                      ${esc(String(event.event_date).slice(0, 10))}
+                      ${esc(
+                        String(event.event_date).slice(0, 10)
+                      )}
                       and closes at
                       ${fmt12(event.end_time)}.
                       It is unavailable right now.
@@ -336,6 +415,7 @@
                     <th>Program / section</th>
                     <th>Time in</th>
                     <th>Proof</th>
+                    <th>Notes</th>
                     <th>Status</th>
                     <th>Registration</th>
                     <th>Action</th>
@@ -355,7 +435,7 @@
                           .join("")
                       : `
                         <tr>
-                          <td colspan="9">
+                          <td colspan="10">
                             No students registered yet.
                           </td>
                         </tr>
@@ -368,75 +448,169 @@
 
           const form = $("reg-form");
 
+          function showRegistrationError(error) {
+            const message = String(
+              error?.message ||
+                "Registration could not be completed."
+            );
+
+            const warning = $(
+              "registration-warning"
+            );
+
+            if (
+              warning &&
+              message
+                .toLowerCase()
+                .includes("not eligible")
+            ) {
+              warning.textContent =
+                "You are not allowed to register for this event because your program is not eligible for it.";
+
+              warning.classList.remove("hidden");
+
+              return;
+            }
+
+            toast(message);
+          }
+
           if (form) {
-            $("find-student").onclick = async () => {
-              const studentNumber = $("sid").value.trim();
-              const preview = $("student-preview");
+            $("find-student").onclick =
+              async () => {
+                const studentNumber =
+                  $("sid").value.trim();
 
-              selectedStudentId = null;
-              preview.classList.add("hidden");
+                const preview =
+                  $("student-preview");
 
-              if (!studentNumber) {
-                toast("Enter a student ID first.");
-                return;
-              }
+                selectedStudentId = null;
 
-              try {
-                const student =
-                  await eatApi.findStudentByNumber(studentNumber);
+                preview.classList.add("hidden");
 
-                if (!student) {
-                  preview.textContent =
-                    "Student not found. Use Register new student to add this student first.";
+                const warning = $(
+                  "registration-warning"
+                );
 
-                  preview.classList.remove("hidden");
+                if (warning) {
+                  warning.classList.add("hidden");
+                  warning.textContent = "";
+                }
+
+                if (!studentNumber) {
+                  toast("Enter a student ID first.");
                   return;
                 }
 
-                selectedStudentId =
-                  Number(student.student_id);
+                try {
+                  const student =
+                    await eatApi.findStudentByNumber(
+                      studentNumber
+                    );
 
-                preview.innerHTML = `
-                  <strong>
-                    ${esc(student.first_name)}
-                    ${esc(student.last_name)}
-                  </strong>
-                    
+                  if (!student) {
+                    preview.textContent =
+                      "Student not found. Use Register new student to add this student first.";
 
-                  Student ID:
-                  ${esc(student.student_number)}
-                    
+                    preview.classList.remove(
+                      "hidden"
+                    );
 
-                  Year and section:
-                  ${esc(
-                    [student.year_level, student.section]
-                      .filter(Boolean)
-                      .join(" - ")
-                  )}
-                `;
+                    return;
+                  }
 
-                preview.classList.remove("hidden");
-              } catch (error) {
-                toast(error.message);
-              }
-            };
+                  const eligibility =
+                    await eatApi.checkEligibility(
+                      Number(student.student_id),
+                      Number(eventId)
+                    );
+
+                  if (!eligibility.eligible) {
+                    preview.textContent =
+                      "You are not allowed to register this student for this event because the student's program is not eligible.";
+
+                    preview.classList.remove(
+                      "hidden"
+                    );
+
+                    selectedStudentId = null;
+
+                    return;
+                  }
+
+                  selectedStudentId = Number(
+                    student.student_id
+                  );
+
+                  preview.innerHTML = `
+                    <strong>
+                      ${esc(student.first_name)}
+                      ${esc(student.last_name)}
+                    </strong>
+                      
+
+                    Student ID:
+                    ${esc(student.student_number)}
+                      
+
+                    Program:
+                    ${esc(student.program_name || "")}
+                      
+
+                    Department:
+                    ${esc(student.department_name || "")}
+                      
+
+                    Year and section:
+                    ${esc(
+                      [
+                        student.year_level,
+                        student.section
+                      ]
+                        .filter(Boolean)
+                        .join(" - ")
+                    )}
+                  `;
+
+                  preview.classList.remove(
+                    "hidden"
+                  );
+                } catch (error) {
+                  toast(error.message);
+                }
+              };
 
             $("sid").oninput = () => {
               selectedStudentId = null;
-              $("student-preview").classList.add("hidden");
+
+              $("student-preview").classList.add(
+                "hidden"
+              );
+
+              const warning = $(
+                "registration-warning"
+              );
+
+              if (warning) {
+                warning.classList.add("hidden");
+                warning.textContent = "";
+              }
             };
 
-            form.onsubmit = async (eventObject) => {
+            form.onsubmit = async (
+              eventObject
+            ) => {
               eventObject.preventDefault();
 
               try {
                 if (!selectedStudentId) {
                   throw new Error(
-                    "Find a valid existing student before registering."
+                    "Find a valid eligible student before registering."
                   );
                 }
 
-                const photo = $("proof").files[0];
+                const photo =
+                  $("proof").files[0];
 
                 if (!photo) {
                   throw new Error(
@@ -444,14 +618,14 @@
                   );
                 }
 
-                const allowedTypes = [
-                  "image/jpeg",
-                  "image/png",
-                  "image/gif",
-                  "image/webp"
-                ];
-
-                if (!allowedTypes.includes(photo.type)) {
+                if (
+                  ![
+                    "image/jpeg",
+                    "image/png",
+                    "image/gif",
+                    "image/webp"
+                  ].includes(photo.type)
+                ) {
                   throw new Error(
                     "Photo proof must be a JPEG, PNG, GIF, or WEBP image."
                   );
@@ -463,11 +637,12 @@
                   );
                 }
 
-                const registration = await eatApi.register(
-                  selectedStudentId,
-                  Number(eventId),
-                  photo
-                );
+                const registration =
+                  await eatApi.register(
+                    selectedStudentId,
+                    Number(eventId),
+                    photo
+                  );
 
                 await eatApi.recordAttendance(
                   registration.registrationId
@@ -479,40 +654,45 @@
 
                 await window.draw();
               } catch (error) {
-                toast(error.message);
+                showRegistrationError(error);
               }
             };
           }
         };
 
-        $("content").onclick = async (eventObject) => {
+        $("content").onclick = async (
+          eventObject
+        ) => {
           const button =
-            eventObject.target.closest("button[data-act]");
+            eventObject.target.closest(
+              "button[data-act]"
+            );
 
           if (!button) return;
 
           const action = button.dataset.act;
-          const registrationId =
-            Number(button.dataset.reg);
-          const attendanceId =
-            Number(button.dataset.att);
+          const registrationId = Number(
+            button.dataset.reg
+          );
+          const attendanceId = Number(
+            button.dataset.att
+          );
 
           try {
             if (action === "record") {
-              await eatApi.recordAttendance(registrationId);
-              toast("Time-in recorded.");
-            }
+              await eatApi.recordAttendance(
+                registrationId
+              );
 
-            if (action === "absent") {
+              toast("Time-in recorded.");
+            } else if (action === "absent") {
               await eatApi.recordAttendance(
                 registrationId,
                 "Absent"
               );
 
               toast("Marked absent.");
-            }
-
-            if (action === "edit") {
+            } else if (action === "edit") {
               const status = prompt(
                 "New status (Present, Late or Absent):",
                 button.dataset.status
@@ -541,28 +721,40 @@
               );
 
               toast("Attendance updated.");
-            }
+            } else if (action === "note") {
+              const noteText = prompt(
+                "Attendance note (maximum 255 characters):",
+                ""
+              );
 
-            if (action === "cancel") {
+              if (!noteText || !noteText.trim()) return;
+
+              await eatApi.addAttendanceNote(
+                attendanceId,
+                noteText.trim()
+              );
+
+              toast("Attendance note added.");
+            } else if (action === "cancel") {
               await eatApi.setRegistrationStatus(
                 registrationId,
                 "Cancelled"
               );
 
               toast("Registration cancelled.");
-            }
-
-            if (action === "reregister") {
+            } else if (action === "reregister") {
               await eatApi.setRegistrationStatus(
                 registrationId,
                 "Registered"
               );
 
               toast("Student re-registered.");
-            }
-
-            if (action === "remove") {
-              if (!confirm("Remove this registration?")) {
+            } else if (action === "remove") {
+              if (
+                !confirm(
+                  "Remove this registration?"
+                )
+              ) {
                 return;
               }
 
