@@ -317,6 +317,15 @@ const eatApi = (() => {
       return list.find((s) => s.student_number === number) || null;
     },
 
+    checkEligibility: (studentId, eventId) =>
+    request(
+      "/api/registrations/lookup/eligibility?studentId=" +
+        encodeURIComponent(studentId) +
+        "&eventId=" +
+        encodeURIComponent(eventId)
+    ),
+
+
     register: (studentOrId, eventId, proofFile) => {
       const formData = new FormData();
       formData.append("eventId", String(eventId));
@@ -352,6 +361,17 @@ const eatApi = (() => {
       ),
     editAttendance: (attendanceId, payload) =>
       send("PUT", "/api/attendance/" + attendanceId, payload),
+    attendanceNotes: (attendanceId) =>
+      request("/api/attendance/" + attendanceId + "/notes"),
+    addAttendanceNote: (attendanceId, noteText) =>
+      send("POST", "/api/attendance/" + attendanceId + "/notes", {
+        noteText,
+      }),
+    deleteAttendanceNote: (attendanceId, noteId) =>
+      request(
+        "/api/attendance/" + attendanceId + "/notes/" + noteId,
+        { method: "DELETE" },
+      ),
   };
 })();
 
