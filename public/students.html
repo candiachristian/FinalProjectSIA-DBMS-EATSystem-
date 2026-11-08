@@ -89,19 +89,17 @@
 
           <div class="row">
             <div>
-              <label for="program-id">Program ID *</label>
+              <label for="department-id">Department *</label>
+              <select id="department-id" required>
+                <option value="">Loading departments…</option>
+              </select>
+            </div>
 
-              <input
-                id="program-id"
-                type="number"
-                min="1"
-                required
-                placeholder="Example: 1"
-              />
-
-              <p class="hint">
-                Enter the program_id from the programs table.
-              </p>
+            <div>
+              <label for="program-id">Program / degree *</label>
+              <select id="program-id" required disabled>
+                <option value="">Choose a department first</option>
+              </select>
             </div>
 
             <div>
@@ -199,6 +197,8 @@
       const studentList = document.getElementById("student-list");
       const saveButton = document.getElementById("save-student");
       const searchInput = document.getElementById("search-students");
+      const departmentSelect = document.getElementById("department-id");
+      const programSelect = document.getElementById("program-id");
 
       const escapeHtml = (value) =>
         String(value ?? "").replace(
@@ -314,6 +314,77 @@
         }
       }
 
+      async function loadDepartments() {
+        departmentSelect.disabled = true;
+        departmentSelect.innerHTML = '<option value="">Loading departments…</option>';
+
+        try {
+          const departments = await request("/api/departments");
+          departmentSelect.innerHTML = '<option value="">Choose a department</option>';
+
+          departments.forEach((department) => {
+            const option = document.createElement("option");
+            option.value = String(department.department_id);
+            option.textContent = department.department_name;
+            departmentSelect.appendChild(option);
+          });
+
+          if (departments.length) {
+            departmentSelect.disabled = false;
+          } else {
+            departmentSelect.innerHTML = '<option value="">No departments available</option>';
+          }
+        } catch (error) {
+          departmentSelect.innerHTML = '<option value="">Could not load departments</option>';
+          showMessage(`Could not load departments: ${error.message}`, "error");
+        }
+      }
+
+      async function loadPrograms(departmentId) {
+        programSelect.disabled = true;
+        programSelect.innerHTML = '<option value="">Loading programs…</option>';
+
+        if (!departmentId) {
+          programSelect.innerHTML = '<option value="">Choose a department first</option>';
+          return;
+        }
+
+        try {
+          const programs = await request(
+            `/api/programs?departmentId=${encodeURIComponent(departmentId)}`,
+          );
+
+          programSelect.innerHTML = '<option value="">Choose a program / degree</option>';
+          programs.forEach((program) => {
+            const option = document.createElement("option");
+            option.value = String(program.program_id);
+            option.textContent = program.program_name;
+            programSelect.appendChild(option);
+          });
+
+          if (programs.length) {
+            programSelect.disabled = false;
+          } else {
+            programSelect.innerHTML = '<option value="">No programs for this department</option>';
+          }
+        } catch (error) {
+          programSelect.innerHTML = '<option value="">Could not load programs</option>';
+          showMessage(`Could not load programs: ${error.message}`, "error");
+        }
+      }
+
+      departmentSelect.addEventListener("change", () => {
+        loadPrograms(departmentSelect.value);
+      });
+
+      form.addEventListener("reset", () => {
+        setTimeout(() => {
+          programSelect.disabled = true;
+          programSelect.innerHTML =
+            '<option value="">Choose a department first</option>';
+        }, 0);
+      });
+
       form.addEventListener("submit", async (event) => {
         event.preventDefault();
 
@@ -343,9 +414,7 @@
             .value
             .trim(),
 
-          programId: Number(
-            document.getElementById("program-id").value
-          ),
+          programId: Number(programSelect.value),
 
           yearLevel: Number(
             document.getElementById("year-level").value
@@ -402,6 +471,7 @@
       });
 
       loadStudents();
+      loadDepartments();
     </script>
   </body>
 </html>
