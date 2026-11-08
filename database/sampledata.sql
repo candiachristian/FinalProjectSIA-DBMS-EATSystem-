@@ -3,7 +3,7 @@ USE event_attendance_db;
 INSERT INTO roles (role_name)
 VALUES ('admin');
  
-INSERT IGNORE INTO departments (department_name)
+INSERT INTO departments (department_name)
 VALUES
     ('College of Arts and sciences'),
     ('College of Business Administration'),
@@ -11,26 +11,26 @@ VALUES
     ('College of Education');  
  
 
-INSERT IGNORE INTO event_categories (category_name)
+INSERT INTO event_categories (category_name)
 VALUES
     ('Seminar'),
     ('Workshop'),
     ('School Activity');
  
 
-INSERT IGNORE INTO event_statuses (status_name)
+INSERT INTO event_statuses (status_name)
 VALUES
     ('Upcoming'),
     ('Ongoing'),
     ('Completed'),
     ('Cancelled');
 
-INSERT IGNORE INTO registration_statuses (status_name)
+INSERT INTO registration_statuses (status_name)
 VALUES
     ('Registered'),
     ('Cancelled');
  
-INSERT IGNORE INTO attendance_statuses (status_name)
+INSERT INTO attendance_statuses (status_name)
 VALUES
     ('Present'),
     ('Late'),
@@ -156,7 +156,7 @@ WHERE program_name = 'BS Business Administration'
 INSERT INTO events
     (event_name, event_date, start_time, end_time,
      grace_period_minutes, venue_id, category_id,
-     status_id, term_id, created_by)
+     status_id, term_id)
 SELECT
     'IT Orientation',
     '2026-11-10',
@@ -166,24 +166,27 @@ SELECT
     v.venue_id,
     c.category_id,
     es.status_id,
-    t.term_id,
-    u.user_id
-FROM venues v
-JOIN event_categories c ON c.category_name = 'Seminar'
-JOIN event_statuses es ON es.status_name = 'Upcoming'
-JOIN academic_terms t ON t.term_name = 'First Semester 2026-2027'
-JOIN users u ON u.username = 'admin'
+    t.term_id
+FROM venues AS v
+JOIN event_categories AS c
+    ON c.category_name = 'Seminar'
+JOIN event_statuses AS es
+    ON es.status_name = 'Upcoming'
+JOIN academic_terms AS t
+    ON t.term_name = 'First Semester 2026-2027'
 WHERE v.venue_name = 'Main Auditorium'
   AND NOT EXISTS (
-      SELECT 1 FROM events
+      SELECT 1
+      FROM events
       WHERE event_name = 'IT Orientation'
         AND event_date = '2026-11-10'
   );
+
  
 INSERT INTO events
     (event_name, event_date, start_time, end_time,
      grace_period_minutes, venue_id, category_id,
-     status_id, term_id, created_by)
+     status_id, term_id)
 SELECT
     'Database Workshop',
     '2026-11-12',
@@ -193,19 +196,22 @@ SELECT
     v.venue_id,
     c.category_id,
     es.status_id,
-    t.term_id,
-    u.user_id
-FROM venues v
-JOIN event_categories c ON c.category_name = 'Workshop'
-JOIN event_statuses es ON es.status_name = 'Upcoming'
-JOIN academic_terms t ON t.term_name = 'First Semester 2026-2027'
-JOIN users u ON u.username = 'admin'
+    t.term_id
+FROM venues AS v
+JOIN event_categories AS c
+    ON c.category_name = 'Workshop'
+JOIN event_statuses AS es
+    ON es.status_name = 'Upcoming'
+JOIN academic_terms AS t
+    ON t.term_name = 'First Semester 2026-2027'
 WHERE v.venue_name = 'Computer Laboratory'
   AND NOT EXISTS (
-      SELECT 1 FROM events
+      SELECT 1
+      FROM events
       WHERE event_name = 'Database Workshop'
         AND event_date = '2026-11-12'
   );
+
  
 
 INSERT INTO registration
@@ -301,6 +307,3 @@ WHERE s.student_number = '202521051'
       WHERE n.attendance_id = a.attendance_id
         AND n.note_text = 'Sample record for testing the attendance notes feature'
   );
-
-UPDATE events SET event_date = CURDATE(), start_time = '00:00:00', end_time = '23:59:00'
-WHERE event_name = 'IT Orientation';
