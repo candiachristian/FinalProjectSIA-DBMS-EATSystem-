@@ -160,6 +160,8 @@
       const programOptions = $("program-options");
       const programPickerSummary = $("program-picker-summary");
       const eventForm = $("event-form");
+      const eventSubmitButton = eventForm.querySelector('button[type="submit"]');
+      let isSubmitting = false;
 
       function escapeHtml(value) {
         return String(value ?? "").replace(/[&<>"']/g, (character) =>
@@ -317,6 +319,7 @@
 
       eventForm.addEventListener("submit", async (event) => {
         event.preventDefault();
+        if (isSubmitting) return;
 
         const payload = {
           eventName: $("name").value.trim(),
@@ -357,6 +360,10 @@
           return;
         }
 
+        isSubmitting = true;
+        eventSubmitButton.disabled = true;
+        eventSubmitButton.textContent = "Saving...";
+
         try {
           const response = await fetch("/api/events", {
             method: "POST",
@@ -375,6 +382,9 @@
         } catch (error) {
           console.error("Create event error:", error);
           alert(error.message || "Could not create event.");
+          isSubmitting = false;
+          eventSubmitButton.disabled = false;
+          eventSubmitButton.textContent = "Save event";
         }
       });
 
