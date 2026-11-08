@@ -250,6 +250,25 @@
             return;
           }
 
+          rows = await Promise.all(
+            rows.map(async (row) => {
+              if (!row.attendance_id) {
+                return { ...row, notes: [] };
+              }
+
+              try {
+                const notes = await eatApi.attendanceNotes(row.attendance_id);
+                return { ...row, notes };
+              } catch (error) {
+                console.error(
+                  `Could not load notes for attendance ${row.attendance_id}:`,
+                  error,
+                );
+                return { ...row, notes: [] };
+              }
+            }),
+          );
+
           const countStatus = (status) =>
             rows.filter(
               (row) =>
@@ -644,13 +663,48 @@
                     photo
                   );
 
-                await eatApi.recordAttendance(
+                const attendance = await eatApi.recordAttendance(
                   registration.registrationId
                 );
 
-                toast(
-                  "Photo proof saved; student registered and time-in recorded."
-                );
+                let completionMessage =
+                  "Photo proof saved; student registered and time-in recorded.";
+                if (attendance.status === "Late") {
+                  let noteSaved = false;
+                  while (!noteSaved) {
+                    const noteText = prompt(
+                      "This student was marked LATE. An attendance note is required (255 characters maximum):",
+                      ""
+                    );
+
+                    if (noteText === null || !noteText.trim()) {
+                      alert("A non-empty attendance note is required for a Late time-in.");
+                      continue;
+                    }
+
+                    if (noteText.trim().length > 255) {
+                      alert("The attendance note must be 255 characters or fewer.");
+                      continue;
+                    }
+
+                    try {
+                      await eatApi.addAttendanceNote(
+                        attendance.attendanceId,
+                        noteText.trim()
+                      );
+                      noteSaved = true;
+                      completionMessage =
+                        "Student registered as Late and the required attendance note was saved.";
+                    } catch (noteError) {
+                      console.error("Could not save late attendance note:", noteError);
+                      alert(
+                        `The note could not be saved: ${noteError.message}\nPlease enter it again.`,
+                      );
+                    }
+                  }
+                }
+
+                toast(completionMessage);
 
                 await window.draw();
               } catch (error) {
