@@ -100,6 +100,17 @@
       };
       const statusView = eventForStatus(event);
       const eventState = eventStatus(statusView);
+      const sections = new Map();
+
+      eventRows.forEach(row => {
+        const sectionName = String(row.section || 'No section').trim() || 'No section';
+        if (!sections.has(sectionName)) sections.set(sectionName, []);
+        sections.get(sectionName).push(row);
+      });
+
+      const sortedSections = [...sections.entries()].sort(([a], [b]) =>
+        a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' })
+      );
 
       return `
         <article class="panel" style="margin-top: 16px">
@@ -138,25 +149,34 @@
                 </tr>
               </thead>
               <tbody>
-                ${eventRows.length ? eventRows.map((row, index) => {
-                  const proof = row.proof_image_path
-                    ? `<a href="${esc(row.proof_image_path)}" target="_blank" rel="noopener">View photo</a>`
-                    : '—';
-                  return `
-                    <tr>
-                      <td>${index + 1}</td>
-                      <td>${esc(row.student_number)}</td>
-                      <td>${esc([row.first_name, row.middle_name, row.last_name].filter(Boolean).join(' '))}</td>
-                      <td>${esc(row.department_name || '')}</td>
-                      <td>${esc([row.program_name, row.year_level, row.section].filter(Boolean).join(' / '))}</td>
-                      <td>${timeLabel(row.time_in)}</td>
-                      <td>${esc(row.attendance_status || 'Not recorded')}</td>
-                      <td>${esc(row.notes || '—')}</td>
-                      <td>${esc(row.registration_status || '')}</td>
-                      <td>${proof}</td>
-                    </tr>
-                  `;
-                }).join('') : '<tr><td colspan="10">No matching students.</td></tr>'}
+                ${eventRows.length ? sortedSections.map(([sectionName, sectionRows]) => `
+                  <tr class="section-heading"><th colspan="10">Section ${esc(sectionName)}</th></tr>
+                  ${sectionRows
+                    .slice()
+                    .sort((a, b) =>
+                      String(a.last_name || '').localeCompare(String(b.last_name || ''), undefined, { sensitivity: 'base' }) ||
+                      String(a.first_name || '').localeCompare(String(b.first_name || ''), undefined, { sensitivity: 'base' })
+                    )
+                    .map((row, index) => {
+                      const proof = row.proof_image_path
+                        ? `<a href="${esc(row.proof_image_path)}" target="_blank" rel="noopener">View photo</a>`
+                        : '—';
+                      return `
+                        <tr>
+                          <td>${index + 1}</td>
+                          <td>${esc(row.student_number)}</td>
+                          <td>${esc([row.first_name, row.middle_name, row.last_name].filter(Boolean).join(' '))}</td>
+                          <td>${esc(row.department_name || '')}</td>
+                          <td>${esc([row.program_name, row.year_level, row.section].filter(Boolean).join(' / '))}</td>
+                          <td>${timeLabel(row.time_in)}</td>
+                          <td>${esc(row.attendance_status || 'Not recorded')}</td>
+                          <td>${esc(row.notes || '—')}</td>
+                          <td>${esc(row.registration_status || '')}</td>
+                          <td>${proof}</td>
+                        </tr>
+                      `;
+                    }).join('')}
+                `).join('') : '<tr><td colspan="10">No matching students.</td></tr>'}
               </tbody>
             </table>
           </div>
