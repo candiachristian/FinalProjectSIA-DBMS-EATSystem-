@@ -86,11 +86,11 @@ async function getAttendanceReport(
 
   sql += `
     ORDER BY
-      p.program_name ASC,
-      s.year_level ASC,
       s.section ASC,
       s.last_name ASC,
-      s.first_name ASC
+      s.first_name ASC,
+      p.program_name ASC,
+      s.year_level ASC
   `;
 
   const [rows] = await db.execute(
