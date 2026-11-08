@@ -81,6 +81,48 @@ async function createEvent(event) {
   try {
     await connection.beginTransaction();
 
+    const departmentId = event.departmentId == null
+      ? null
+      : Number(event.departmentId);
+    const allDepartments = event.allDepartments === true;
+
+    if (!allDepartments && (!Number.isInteger(departmentId) || departmentId <= 0)) {
+      const error = new Error("Select a valid eligible department.");
+      error.code = "PROGRAM_DEPARTMENT_MISMATCH";
+      throw error;
+    }
+
+    const programIds = [...new Set((event.programIds || []).map(Number))];
+    if (programIds.length === 0 || programIds.some((id) => !Number.isInteger(id) || id <= 0)) {
+      const error = new Error("Select at least one valid eligible program.");
+      error.code = "PROGRAM_DEPARTMENT_MISMATCH";
+      throw error;
+    }
+
+    const placeholders = programIds.map(() => "?").join(", ");
+    const programQuery = allDepartments
+      ? `SELECT program_id FROM programs WHERE program_id IN (${placeholders})`
+      : `SELECT program_id FROM programs
+          WHERE department_id = ? AND program_id IN (${placeholders})`;
+    const queryParameters = allDepartments
+      ? programIds
+      : [departmentId, ...programIds];
+    const [eligiblePrograms] = await connection.execute(
+      programQuery,
+      queryParameters,
+    );
+    const verifiedProgramIds = eligiblePrograms.map((program) => Number(program.program_id));
+
+    if (verifiedProgramIds.length !== programIds.length) {
+      const error = new Error(
+        allDepartments
+          ? "One or more selected programs do not exist."
+          : "Every selected program must belong to the selected department.",
+      );
+      error.code = "PROGRAM_DEPARTMENT_MISMATCH";
+      throw error;
+    }
+
     let venueId = event.venueId;
 
     if (!venueId && event.venueName) {
@@ -129,6 +171,20 @@ async function createEvent(event) {
         statusId,
         event.termId ?? null,
       ],
+    );
+
+    const eventProgramPlaceholders = verifiedProgramIds
+      .map(() => "(?, ?)")
+      .join(", ");
+    const eventProgramParameters = verifiedProgramIds.flatMap((programId) => [
+      result.insertId,
+      programId,
+    ]);
+
+    await connection.execute(
+      `INSERT INTO event_programs (event_id, program_id)
+       VALUES ${eventProgramPlaceholders}`,
+      eventProgramParameters,
     );
 
     await connection.commit();
@@ -187,12 +243,26 @@ async function updateEvent(eventId, event) {
 }
 
 async function deleteEvent(eventId) {
-  const [result] = await db.execute(
-    'DELETE FROM events WHERE event_id = ?',
-    [eventId]
-  );
+  const connection = await db.getConnection();
 
-  return result.affectedRows > 0;
+  try {
+    await connection.beginTransaction();
+    await connection.execute(
+      'DELETE FROM event_programs WHERE event_id = ?',
+      [eventId],
+    );
+    const [result] = await connection.execute(
+      'DELETE FROM events WHERE event_id = ?',
+      [eventId],
+    );
+    await connection.commit();
+    return result.affectedRows > 0;
+  } catch (error) {
+    await connection.rollback();
+    throw error;
+  } finally {
+    connection.release();
+  }
 }
 
 module.exports = {

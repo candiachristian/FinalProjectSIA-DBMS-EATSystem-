@@ -55,7 +55,31 @@ function validateEvent(body) {
   return null;
 }
 
+function validateEventAudience(body) {
+  if (body.allDepartments !== true && !isPositiveInteger(body.departmentId)) {
+    return 'departmentId must be a valid positive number.';
+  }
+
+  if (
+    !Array.isArray(body.programIds) ||
+    body.programIds.length === 0 ||
+    body.programIds.some((programId) => !isPositiveInteger(programId))
+  ) {
+    return 'Select at least one valid eligible program.';
+  }
+
+  return null;
+}
+
 function handleDatabaseError(error, res) {
+  if (error.code === 'PROGRAM_DEPARTMENT_MISMATCH') {
+    return res.status(400).json({
+      success: false,
+      message: error.message,
+      data: null
+    });
+  }
+
   if (error.code === 'VENUE_NOT_FOUND') {
     return res.status(400).json({
       success: false,
@@ -154,6 +178,15 @@ async function addEvent(req, res) {
       });
     }
 
+    const audienceError = validateEventAudience(body);
+    if (audienceError) {
+      return res.status(400).json({
+        success: false,
+        message: audienceError,
+        data: null
+      });
+    }
+
     const event = await Event.createEvent({
       eventName: String(body.eventName).trim(),
       eventDate: body.eventDate,
@@ -165,6 +198,11 @@ async function addEvent(req, res) {
       categoryId: Number(body.categoryId),
       statusId: body.statusId,
       termId: body.termId,
+      departmentId: body.allDepartments === true
+        ? null
+        : Number(body.departmentId),
+      allDepartments: body.allDepartments === true,
+      programIds: [...new Set(body.programIds.map(Number))],
     });
 
     return res.status(201).json({
