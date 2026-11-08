@@ -171,7 +171,7 @@
             ? row.notes
                 .map(
                   (note) =>
-                    `<div><strong>${esc(note.added_by_username || "Admin")}:</strong> ${esc(note.note_text)}</div>`
+                    `<div>${esc(note.note_text)}</div>`
                 )
                 .join("")
             : "—";

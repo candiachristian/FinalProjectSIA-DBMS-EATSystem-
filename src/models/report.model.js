@@ -12,6 +12,7 @@ async function getAttendanceReport(
       e.event_date,
 
       r.registration_id,
+      r.proof_image_path,
 
       a.attendance_id,
 
@@ -28,6 +29,7 @@ async function getAttendanceReport(
       s.section,
 
       ast.status_name AS attendance_status,
+      DATE_FORMAT(a.time_in, '%Y-%m-%d %H:%i:%s') AS time_in,
       rs.status_name AS registration_status,
 
       (
