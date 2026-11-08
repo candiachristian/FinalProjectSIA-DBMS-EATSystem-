@@ -1,386 +1,117 @@
 <!doctype html>
 <html lang="en">
-  <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Create event · Events</title>
-    <link rel="stylesheet" href="style.css" />
-    <script src="app.js"></script>
-    <style>
-      .eligibility-fields {
-        width: 250px !important;
-        max-width: 100%;
-        margin: 0;
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+
+  <title>Manage Events</title>
+
+  <link rel="stylesheet" href="style.css">
+  <script src="app.js"></script>
+</head>
+
+<body>
+  <header>
+    <div class="brand">
+      <span class="brand-mark">📝</span>
+      <h1>Manage events</h1>
+    </div>
+
+    <a href="index.html" style="color: white">Dashboard</a>
+  </header>
+
+  <main class="wrap">
+    <div class="title-row">
+      <h2>All events</h2>
+
+      <a class="button" href="add-event.html">
+        ＋ Add event
+      </a>
+    </div>
+
+    <section id="event-list" class="grid" aria-live="polite"></section>
+  </main>
+
+  <script>
+    requireAdmin();
+
+    function renderEvents() {
+      const events = system.getEvents();
+      const list = $('event-list');
+
+      if (events.length === 0) {
+        list.innerHTML = `
+          <div class="panel empty">
+            No events yet. Add your first event.
+          </div>
+        `;
+        return;
       }
 
-      .eligibility-fields select {
-        display: block;
-        width: 250px !important;
-        max-width: 100%;
-      }
+      list.innerHTML = events.map(event => `
+        <article class="panel">
+          <div class="title-row">
+            <h3>${esc(event.name)}</h3>
 
-      .department-note {
-        margin-top: 8px;
-      }
-
-      .program-picker {
-        width: min(700px, calc(100vw - 48px));
-        margin-top: 12px;
-        border: 1px solid #cbdbea;
-        border-radius: 10px;
-        background: #fff;
-      }
-
-      .program-picker summary {
-        padding: 10px 12px;
-        cursor: pointer;
-        font-weight: 600;
-      }
-
-      #program-options {
-        max-height: 220px;
-        overflow-y: auto;
-        padding: 0 12px 10px;
-      }
-    </style>
-  </head>
-
-  <body>
-    <header>
-      <div class="brand">
-        <span class="brand-mark">📝</span>
-        <h1>Events · Admin</h1>
-      </div>
-      <a href="index.html" style="color: white">Dashboard</a>
-    </header>
-
-    <main class="wrap narrow">
-      <section class="hero">
-        <h2>Create an event</h2>
-        <p>Set a clear event window so students know when registration is open.</p>
-      </section>
-
-      <section class="panel">
-        <form id="event-form">
-          <label for="name">Event name *</label>
-          <input
-            id="name"
-            required
-            maxlength="100"
-            placeholder="e.g. Campus Sports Festival"
-          />
-
-          <label for="category">Category *</label>
-          <select id="category" required>
-            <option value="">Loading categories…</option>
-          </select>
-
-          <label for="term">Academic term *</label>
-          <select id="term" required>
-            <option value="">Loading academic terms…</option>
-          </select>
-
-          <div class="eligibility-fields">
-            <label style="display: flex; align-items: center; gap: 8px; margin-bottom: 10px">
-              <input id="all-departments" type="checkbox" style="width: auto; margin: 0" />
-              <span>Select all departments</span>
-            </label>
-
-            <label for="department">Eligible department *</label>
-            <select id="department" required>
-              <option value="">Loading departments…</option>
-            </select>
-
-            <p class="hint department-note">
-              Choose a department, then select the eligible programs. “Select all departments” loads programs from every department.
-            </p>
-
-            <details id="program-picker" class="program-picker">
-              <summary id="program-picker-summary">Choose eligible programs</summary>
-              <label style="display: flex; align-items: center; gap: 8px; margin: 8px 12px">
-                <input id="all-programs" type="checkbox" style="width: auto; margin: 0" />
-                <span>Select all programs</span>
-              </label>
-              <div id="program-options">Select a department first.</div>
-            </details>
+            <span class="badge ${eventStatus(event)}">
+              ${eventStatus(event)}
+            </span>
           </div>
 
-          <div class="row">
-            <div>
-              <label for="date">Date *</label>
-              <input id="date" type="date" required />
-            </div>
-            <div>
-              <label for="venue">Venue *</label>
-              <input id="venue" required placeholder="Building / room" />
-            </div>
-          </div>
+          <p>
+            <strong>Date:</strong> ${esc(event.date)}
+          </p>
 
-          <div class="row">
-            <div>
-              <label for="start">Starts *</label>
-              <input id="start" type="time" required />
-            </div>
-            <div>
-              <label for="end">Ends *</label>
-              <input id="end" type="time" required />
-            </div>
-          </div>
+          <p>
+            <strong>Time:</strong>
+            ${fmt12(event.start)}–${fmt12(event.end)}
+          </p>
 
-          <label for="grace">On-time grace period in minutes</label>
-          <input id="grace" type="number" min="0" max="180" value="15" />
+          <p>
+            <strong>Venue:</strong> ${esc(event.venue)}
+          </p>
 
-          <p class="hint">
-            Student registration and photo-proof submission are available only
-            during the event start-to-end window.
+          <p>
+            <strong>Grace period:</strong> ${Number(event.grace) || 0} minutes
+          </p>
+
+          <p>
+            <strong>Registered students:</strong> ${event.attendees.length}
           </p>
 
           <div class="actions">
-            <button type="submit">Save event</button>
             <a
               class="button"
-              href="index.html"
-              style="background: #edf3fb; color: #284362; box-shadow: none"
+              href="attendance.html?event=${event.id}"
             >
-              Cancel
+              Open attendance
             </a>
+
+            <button
+              class="danger"
+              type="button"
+              onclick="deleteEvent(${event.id})"
+            >
+              Delete event
+            </button>
           </div>
-        </form>
-      </section>
-    </main>
+        </article>
+      `).join('');
+    }
 
-    <script>
-      requireRole("admin");
+    function deleteEvent(eventId) {
+      const confirmed = confirm(
+        'Delete this event and all associated attendance records?'
+      );
 
-      const categorySelect = $("category");
-      const termSelect = $("term");
-      const departmentSelect = $("department");
-      const allDepartmentsCheckbox = $("all-departments");
-      const allProgramsCheckbox = $("all-programs");
-      const programOptions = $("program-options");
-      const programPickerSummary = $("program-picker-summary");
-      const eventForm = $("event-form");
+      if (!confirmed) return;
 
-      function escapeHtml(value) {
-        return String(value ?? "").replace(/[&<>"']/g, (character) =>
-          ({
-            "&": "&amp;",
-            "<": "&lt;",
-            ">": "&gt;",
-            '"': "&quot;",
-            "'": "&#39;",
-          })[character],
-        );
-      }
+      system.deleteEvent(eventId);
+      renderEvents();
+      toast('Event deleted.');
+    }
 
-      async function getList(url, label) {
-        const response = await fetch(url);
-        const result = await response.json().catch(() => ({}));
-        if (!response.ok || !result.success) {
-          throw new Error(result.message || `Could not load ${label}.`);
-        }
-        return result.data || [];
-      }
-
-      async function loadCategories() {
-        categorySelect.disabled = true;
-        categorySelect.innerHTML = '<option value="">Loading categories…</option>';
-        try {
-          const categories = await getList("/api/event-categories", "categories");
-          categorySelect.innerHTML = '<option value="">Select a category</option>';
-          categories.forEach((category) => {
-            const option = document.createElement("option");
-            option.value = String(Number(category.category_id));
-            option.textContent = category.category_name;
-            categorySelect.appendChild(option);
-          });
-          if (!categories.length) {
-            categorySelect.innerHTML = '<option value="">No categories available</option>';
-          } else {
-            categorySelect.disabled = false;
-          }
-        } catch (error) {
-          categorySelect.innerHTML = '<option value="">Could not load categories</option>';
-          alert(error.message);
-        }
-      }
-
-      async function loadTerms() {
-        termSelect.disabled = true;
-        termSelect.innerHTML = '<option value="">Loading academic terms…</option>';
-        try {
-          const terms = await getList("/api/academic-terms", "academic terms");
-          termSelect.innerHTML = '<option value="">Select an academic term</option>';
-          terms.forEach((term) => {
-            const option = document.createElement("option");
-            option.value = String(Number(term.term_id));
-            option.textContent = term.term_name;
-            termSelect.appendChild(option);
-          });
-          if (!terms.length) {
-            termSelect.innerHTML = '<option value="">No academic terms available</option>';
-          } else {
-            termSelect.disabled = false;
-          }
-        } catch (error) {
-          termSelect.innerHTML = '<option value="">Could not load academic terms</option>';
-          alert(error.message);
-        }
-      }
-
-      async function loadDepartments() {
-        departmentSelect.disabled = true;
-        departmentSelect.innerHTML = '<option value="">Loading departments…</option>';
-        try {
-          const departments = await getList("/api/departments", "departments");
-          departmentSelect.innerHTML = '<option value="">Select a department</option>';
-          departments.forEach((department) => {
-            const option = document.createElement("option");
-            option.value = String(Number(department.department_id));
-            option.textContent = department.department_name;
-            departmentSelect.appendChild(option);
-          });
-          if (!departments.length) {
-            departmentSelect.innerHTML = '<option value="">No departments available</option>';
-          } else {
-            departmentSelect.disabled = false;
-          }
-        } catch (error) {
-          departmentSelect.innerHTML = '<option value="">Could not load departments</option>';
-          alert(error.message);
-        }
-      }
-
-      async function loadPrograms() {
-        const departmentId = departmentSelect.value;
-        const url = allDepartmentsCheckbox.checked
-          ? "/api/programs"
-          : `/api/programs?departmentId=${encodeURIComponent(departmentId)}`;
-
-        programOptions.textContent = "Loading programs…";
-        allProgramsCheckbox.checked = false;
-
-        if (!allDepartmentsCheckbox.checked && !departmentId) {
-          programOptions.textContent = "Select a department first.";
-          programPickerSummary.textContent = "Choose eligible programs";
-          return;
-        }
-
-        try {
-          const programs = await getList(url, "programs");
-          if (!programs.length) {
-            programOptions.textContent = "No programs are available for this selection.";
-            programPickerSummary.textContent = "No programs available";
-            return;
-          }
-
-          programOptions.innerHTML = programs.map((program) => `
-            <label style="display: flex; align-items: center; justify-content: flex-start; gap: 8px; width: 100%; margin: 8px 0; text-align: left">
-              <input type="checkbox" name="eligibleProgram" value="${Number(program.program_id)}" style="width: auto; margin: 0; flex: 0 0 auto" />
-              <span>${escapeHtml(program.department_name ? `${program.department_name} — ` : "")}${escapeHtml(program.program_name)}</span>
-            </label>
-          `).join("");
-          programPickerSummary.textContent = `Choose eligible programs (${programs.length} available)`;
-        } catch (error) {
-          programOptions.textContent = error.message || "Could not load programs.";
-          programPickerSummary.textContent = "Could not load programs";
-        }
-      }
-
-      allDepartmentsCheckbox.addEventListener("change", () => {
-        departmentSelect.disabled = allDepartmentsCheckbox.checked;
-        departmentSelect.required = !allDepartmentsCheckbox.checked;
-        if (allDepartmentsCheckbox.checked) {
-          departmentSelect.value = "";
-        }
-        loadPrograms();
-      });
-
-      departmentSelect.addEventListener("change", loadPrograms);
-
-      allProgramsCheckbox.addEventListener("change", () => {
-        programOptions
-          .querySelectorAll('input[name="eligibleProgram"]')
-          .forEach((checkbox) => {
-            checkbox.checked = allProgramsCheckbox.checked;
-          });
-      });
-
-      programOptions.addEventListener("change", (event) => {
-        if (event.target.matches('input[name="eligibleProgram"]')) {
-          const boxes = Array.from(
-            programOptions.querySelectorAll('input[name="eligibleProgram"]'),
-          );
-          allProgramsCheckbox.checked = boxes.length > 0 && boxes.every((box) => box.checked);
-        }
-      });
-
-      eventForm.addEventListener("submit", async (event) => {
-        event.preventDefault();
-
-        const payload = {
-          eventName: $("name").value.trim(),
-          eventDate: $("date").value,
-          startTime: $("start").value,
-          endTime: $("end").value,
-          venue: $("venue").value.trim(),
-          gracePeriodMinutes: Number($("grace").value),
-          categoryId: Number(categorySelect.value),
-          termId: Number(termSelect.value),
-          allDepartments: allDepartmentsCheckbox.checked,
-          departmentId: allDepartmentsCheckbox.checked
-            ? null
-            : Number(departmentSelect.value),
-          programIds: Array.from(
-            programOptions.querySelectorAll('input[name="eligibleProgram"]:checked'),
-          ).map((checkbox) => Number(checkbox.value)),
-        };
-
-        if (!payload.categoryId) {
-          alert("Please select an event category.");
-          return;
-        }
-        if (!payload.termId) {
-          alert("Please select an academic term.");
-          return;
-        }
-        if (!payload.allDepartments && !payload.departmentId) {
-          alert("Please select an eligible department.");
-          return;
-        }
-        if (!payload.programIds.length) {
-          alert("Select at least one eligible program.");
-          return;
-        }
-        if (payload.endTime <= payload.startTime) {
-          alert("The event end time must be later than its start time.");
-          return;
-        }
-
-        try {
-          const response = await fetch("/api/events", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(payload),
-          });
-          const result = await response.json().catch(() => ({}));
-          if (!response.ok || !result.success) {
-            throw new Error(result.message || "Could not create event.");
-          }
-
-          toast("Event created.");
-          setTimeout(() => {
-            window.location.href = "show-events.html";
-          }, 650);
-        } catch (error) {
-          console.error("Create event error:", error);
-          alert(error.message || "Could not create event.");
-        }
-      });
-
-      loadCategories();
-      loadTerms();
-      loadDepartments();
-    </script>
-  </body>
+    renderEvents();
+  </script>
+</body>
 </html>
