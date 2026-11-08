@@ -54,136 +54,202 @@
         </div>
       </div>
 
-      <div id="reports"></div>
+      <div id="reports" aria-live="polite"></div>
     </section>
   </main>
 
   <script>
     requireAdmin();
 
-    // Populate the event selector.
-    system.getEvents().forEach(event => {
-      $('event').insertAdjacentHTML(
-        'beforeend',
-        `<option value="${event.id}">${esc(event.name)}</option>`
-      );
-    });
+    const eventSelect = $('event');
+    const reportsElement = $('reports');
+    let events = [];
+    let rows = [];
+    let loadedEventId = null;
+    let selectedEventDetails = null;
 
-    function drawReports() {
+    async function getJson(url) {
+      const response = await fetch(url);
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok || !result.success) {
+        throw new Error(result.message || `Request failed (${response.status}).`);
+      }
+      return result;
+    }
+
+    function eventForStatus(event) {
+      return {
+        date: String(event.event_date || '').slice(0, 10),
+        start: String(event.start_time || '').slice(0, 5),
+        end: String(event.end_time || '').slice(0, 5)
+      };
+    }
+
+    function timeLabel(value) {
+      if (!value) return '—';
+      const time = String(value).slice(11, 16);
+      return time.includes(':') ? fmt12(time) : '—';
+    }
+
+    function renderEvent(event, eventRows) {
+      const summary = {
+        Registered: eventRows.filter(row => row.registration_status === 'Registered').length,
+        Present: eventRows.filter(row => row.attendance_status === 'Present').length,
+        Late: eventRows.filter(row => row.attendance_status === 'Late').length,
+        Absent: eventRows.filter(row => row.attendance_status === 'Absent').length
+      };
+      const statusView = eventForStatus(event);
+      const eventState = eventStatus(statusView);
+
+      return `
+        <article class="panel" style="margin-top: 16px">
+          <div class="title-row">
+            <div>
+              <h2>${esc(event.event_name)}</h2>
+              <p>
+                ${esc(statusView.date)}
+                · ${fmt12(statusView.start)}–${fmt12(statusView.end)}
+                · ${esc(event.venue_name || event.venue || '')}
+              </p>
+            </div>
+            <span class="badge ${esc(eventState)}">${esc(eventState)}</span>
+          </div>
+
+          <div class="stats">
+            ${Object.entries(summary).map(([label, count]) => `
+              <div class="stat"><b>${count}</b> ${esc(label)}</div>
+            `).join('')}
+          </div>
+
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>#</th>
+                  <th>Student ID</th>
+                  <th>Name</th>
+                  <th>Department</th>
+                  <th>Program / year / section</th>
+                  <th>Time in</th>
+                  <th>Attendance status</th>
+                  <th>Notes</th>
+                  <th>Registration status</th>
+                  <th>Proof</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${eventRows.length ? eventRows.map((row, index) => {
+                  const proof = row.proof_image_path
+                    ? `<a href="${esc(row.proof_image_path)}" target="_blank" rel="noopener">View photo</a>`
+                    : '—';
+                  return `
+                    <tr>
+                      <td>${index + 1}</td>
+                      <td>${esc(row.student_number)}</td>
+                      <td>${esc([row.first_name, row.middle_name, row.last_name].filter(Boolean).join(' '))}</td>
+                      <td>${esc(row.department_name || '')}</td>
+                      <td>${esc([row.program_name, row.year_level, row.section].filter(Boolean).join(' / '))}</td>
+                      <td>${timeLabel(row.time_in)}</td>
+                      <td>${esc(row.attendance_status || 'Not recorded')}</td>
+                      <td>${esc(row.notes || '—')}</td>
+                      <td>${esc(row.registration_status || '')}</td>
+                      <td>${proof}</td>
+                    </tr>
+                  `;
+                }).join('') : '<tr><td colspan="10">No matching students.</td></tr>'}
+              </tbody>
+            </table>
+          </div>
+        </article>
+      `;
+    }
+
+    function drawRows() {
       const query = $('query').value.trim().toLowerCase();
-      const selectedEventId = $('event').value;
-
-      const events = system.getEvents().filter(event => {
-        return !selectedEventId || event.id === Number(selectedEventId);
+      const filteredRows = rows.filter(row => {
+        const searchable = [
+          row.student_number,
+          row.first_name,
+          row.middle_name,
+          row.last_name
+        ].filter(Boolean).join(' ').toLowerCase();
+        return searchable.includes(query);
       });
 
-      if (events.length === 0) {
-        $('reports').innerHTML = `
-          <p class="empty">No events to report yet.</p>
-        `;
+      if (filteredRows.length === 0) {
+        reportsElement.innerHTML = '<p class="empty">No attendance records found.</p>';
         return;
       }
 
-      $('reports').innerHTML = events.map(event => {
-        const summary = system.summary(event);
+      const grouped = new Map();
+      filteredRows.forEach(row => {
+        const key = String(row.event_id);
+        if (!grouped.has(key)) grouped.set(key, []);
+        grouped.get(key).push(row);
+      });
 
-        const attendees = event.attendees.filter(student => {
-          const searchableText =
-            `${student.first} ${student.middle || ''} ${student.last} ${student.studentId}`
-              .toLowerCase();
+      const groups = [...grouped.entries()].map(([id, eventRows]) => {
+        const event = selectedEventDetails && String(selectedEventDetails.event_id) === id
+          ? selectedEventDetails
+          : events.find(item => String(item.event_id) === id) || {
+              event_id: id,
+              event_name: eventRows[0].event_name,
+              event_date: eventRows[0].event_date,
+              start_time: '',
+              end_time: ''
+            };
+        return { event, eventRows };
+      });
 
-          return searchableText.includes(query);
-        });
-
-        return `
-          <article class="panel" style="margin-top: 16px">
-            <div class="title-row">
-              <div>
-                <h2>${esc(event.name)}</h2>
-                <p>
-                  ${esc(event.date)}
-                  · ${fmt12(event.start)}–${fmt12(event.end)}
-                  · ${esc(event.venue)}
-                </p>
-              </div>
-
-              <span class="badge ${eventStatus(event)}">
-                ${eventStatus(event)}
-              </span>
-            </div>
-
-            <div class="stats">
-              ${Object.entries({
-                Registered: event.attendees.length,
-                ...summary
-              })
-                .map(([label, count]) => `
-                  <div class="stat">
-                    <b>${count}</b>
-                    ${label}
-                  </div>
-                `)
-                .join('')}
-            </div>
-
-            <div class="table-wrap">
-              <table>
-                <thead>
-                  <tr>
-                    <th>#</th>
-                    <th>Student ID</th>
-                    <th>Name</th>
-                    <th>Department</th>
-                    <th>Program / section</th>
-                    <th>Time in</th>
-                    <th>Status</th>
-                    <th>Proof</th>
-                  </tr>
-                </thead>
-
-                <tbody>
-                  ${
-                    attendees.length
-                      ? attendees.map((student, index) => `
-                          <tr>
-                            <td>${index + 1}</td>
-                            <td>${esc(student.studentId)}</td>
-                            <td>
-                              ${esc(student.first)}
-                              ${esc(student.middle || '')}
-                              ${esc(student.last)}
-                            </td>
-                            <td>${esc(student.department || '')}</td>
-                            <td>
-                              ${esc(student.course || '')}
-                              ${esc(student.section || '')}
-                            </td>
-                            <td>
-                              ${student.timeIn ? fmt12(student.timeIn) : '—'}
-                            </td>
-                            <td>
-                              ${system.attendeeStatus(event, student)}
-                            </td>
-                            <td>
-                              ${student.proof ? 'Photo submitted' : '—'}
-                            </td>
-                          </tr>
-                        `).join('')
-                      : `
-                        <tr>
-                          <td colspan="8">No matching students.</td>
-                        </tr>
-                      `
-                  }
-                </tbody>
-              </table>
-            </div>
-          </article>
-        `;
-      }).join('');
+      reportsElement.innerHTML = groups
+        .map(group => renderEvent(group.event, group.eventRows))
+        .join('');
     }
 
-    drawReports();
+    async function drawReports() {
+      const selectedId = eventSelect.value;
+      if (loadedEventId !== selectedId) {
+        reportsElement.innerHTML = '<p class="empty">Loading report data…</p>';
+        try {
+          if (selectedId) {
+            const result = await getJson(`/api/reports/events/${encodeURIComponent(selectedId)}`);
+            rows = result.data || [];
+            selectedEventDetails = {
+              ...(events.find(item => String(item.event_id) === selectedId) || {}),
+              ...(result.event || {})
+            };
+          } else {
+            const result = await getJson('/api/reports/attendance');
+            rows = result.data || [];
+            selectedEventDetails = null;
+          }
+          loadedEventId = selectedId;
+        } catch (error) {
+          console.error('Could not load report data:', error);
+          reportsElement.innerHTML = `<p class="notice error">${esc(error.message || 'Could not load reports.')}</p>`;
+          return;
+        }
+      }
+      drawRows();
+    }
+
+    async function loadEvents() {
+      const result = await getJson('/api/events');
+      events = Array.isArray(result.data) ? result.data : [];
+      eventSelect.innerHTML = '<option value="">All events</option>' + events.map(event => `
+        <option value="${Number(event.event_id)}">${esc(event.event_name)}</option>
+      `).join('');
+    }
+
+    (async () => {
+      try {
+        await loadEvents();
+        await drawReports();
+      } catch (error) {
+        console.error('Could not initialize reports:', error);
+        reportsElement.innerHTML = `<p class="notice error">${esc(error.message || 'Could not load events or reports.')}</p>`;
+      }
+    })();
   </script>
 </body>
 </html>

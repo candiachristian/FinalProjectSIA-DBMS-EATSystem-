@@ -1,484 +1,783 @@
 <!doctype html>
 <html lang="en">
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Attendance</title>
+  <head>
+    <meta charset="utf-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1"
+    />
 
-  <link rel="stylesheet" href="style.css">
-  <script src="app.js"></script>
-</head>
+    <title>Attendance</title>
 
-<body>
-  <header>
-    <div class="brand">
-      <span class="brand-mark">📝</span>
-      <h1>Attendance &amp; student registration</h1>
-    </div>
+    <link rel="stylesheet" href="style.css" />
+    <script src="app.js"></script>
+  </head>
 
-    <a href="index.html" style="color: white">Dashboard</a>
-  </header>
+  <body>
+    <header>
+      <div class="brand">
+        <span class="brand-mark">📝</span>
+        <h1>Attendance &amp; student registration</h1>
+      </div>
 
-  <main class="wrap">
-    <section class="panel">
-      <label for="event">Select event</label>
+      <a href="index.html" style="color: white">
+        Dashboard
+      </a>
+    </header>
 
-      <select id="event" onchange="draw()">
-        <option value="">Choose an event…</option>
-      </select>
+    <main class="wrap">
+      <section class="panel">
+        <label for="event">Select event</label>
 
-      <div id="content"></div>
-    </section>
-  </main>
+        <select id="event" onchange="draw()">
+          <option value="">Choose an event…</option>
+        </select>
 
-  <script>
-    requireAdmin();
+        <div id="content"></div>
+      </section>
+    </main>
 
-    system.getEvents().forEach(event => {
-      $('event').insertAdjacentHTML(
-        'beforeend',
-        `<option value="${event.id}">
-          ${esc(event.name)} · ${esc(event.date)} · ${fmt12(event.start)}
-        </option>`
-      );
-    });
+    <script>
+      requireAdmin();
 
-    const eventFromUrl = new URLSearchParams(location.search).get('event');
-    if (eventFromUrl) {
-      $('event').value = eventFromUrl;
-    }
+      (async () => {
+        const events = {};
+        let selectedStudentId = null;
 
-    function draw() {
-      const event = system.getEvent($('event').value);
+        const asLocal = (event) => ({
+          date: event.event_date,
+          start: event.start_time,
+          end: event.end_time
+        });
 
-      if (!event) {
-        $('content').innerHTML = '';
-        return;
-      }
+        async function loadEvents() {
+          const requestedEventId =
+            new URLSearchParams(location.search).get("event");
 
-      const summary = system.summary(event);
-      const registrationOpen = system.canRegister(event);
+          const eventList = await eatApi.events();
 
-      $('content').innerHTML = `
-        <div class="stats">
-          ${Object.entries({
-            Registered: event.attendees.length,
-            ...summary
-          })
-            .map(([label, count]) => `
-              <div class="stat">
-                <b>${count}</b>
-                ${label}
-              </div>
-            `)
-            .join('')}
-        </div>
+          $("event").innerHTML =
+            '<option value="">Choose an event…</option>';
 
-        <section class="panel" style="margin: 12px 0; background: #f6f9ff">
-          <div class="title-row">
-            <div>
-              <h3>Register a student</h3>
-              <p class="hint">
-                Enter the student's details and attach photo proof.
-                Registration is allowed only while this event is in progress.
-              </p>
+          eventList.forEach((event) => {
+            events[event.event_id] = event;
+
+            $("event").insertAdjacentHTML(
+              "beforeend",
+              `<option value="${event.event_id}">
+                ${esc(event.event_name)}
+                ·
+                ${esc(String(event.event_date).slice(0, 10))}
+                ·
+                ${fmt12(event.start_time)}
+              </option>`
+            );
+          });
+
+          if (
+            requestedEventId &&
+            events[requestedEventId]
+          ) {
+            $("event").value = requestedEventId;
+          }
+        }
+
+        function rowHtml(row, completed) {
+          const attendanceStatus =
+            row.attendance_status ||
+            (completed ? "Not recorded" : "Registered");
+
+          const actions = [];
+
+          if (row.attendance_id === null) {
+            actions.push(
+              `<button
+                data-act="record"
+                data-reg="${row.registration_id}"
+              >
+                Record time-in
+              </button>`
+            );
+
+            actions.push(
+              `<button
+                data-act="absent"
+                data-reg="${row.registration_id}"
+              >
+                Absent
+              </button>`
+            );
+          } else {
+            actions.push(
+              `<button
+                data-act="edit"
+                data-att="${row.attendance_id}"
+                data-status="${esc(attendanceStatus)}"
+              >
+                Edit
+              </button>`
+            );
+            actions.push(
+              `<button
+                data-act="note"
+                data-att="${row.attendance_id}"
+              >
+                Add note
+              </button>`
+            );
+          }
+
+          actions.push(
+            row.registration_status === "Registered"
+              ? `<button
+                  data-act="cancel"
+                  data-reg="${row.registration_id}"
+                >
+                  Cancel registration
+                </button>`
+              : `<button
+                  data-act="reregister"
+                  data-reg="${row.registration_id}"
+                >
+                  Re-register
+                </button>`
+          );
+
+          actions.push(
+            `<button
+              class="danger"
+              data-act="remove"
+              data-reg="${row.registration_id}"
+            >
+              Remove
+            </button>`
+          );
+
+          const timeIn = row.time_in
+            ? fmt12(String(row.time_in).slice(11, 16))
+            : "—";
+
+          const proofLink = row.proof_image_path
+            ? `<a
+                href="${esc(row.proof_image_path)}"
+                target="_blank"
+                rel="noopener"
+              >
+                View photo
+              </a>`
+            : "—";
+
+          const notes = (row.notes || []).length
+            ? row.notes
+                .map(
+                  (note) =>
+                    `<div><strong>${esc(note.added_by_username || "Admin")}:</strong> ${esc(note.note_text)}</div>`
+                )
+                .join("")
+            : "—";
+
+          return `
+            <tr>
+              <td>
+                ${esc(row.student_number || "")}
+              </td>
+
+              <td>
+                ${esc(row.first_name || "")}
+                ${esc(row.last_name || "")}
+              </td>
+
+              <td>
+                ${esc(row.department_name || "")}
+              </td>
+
+              <td>
+                ${esc(row.program_name || "")}
+                ${esc(
+                  [
+                    row.year_level,
+                    row.section
+                  ]
+                    .filter(Boolean)
+                    .join(" - ")
+                )}
+              </td>
+
+              <td>${timeIn}</td>
+
+              <td>${proofLink}</td>
+
+              <td>${notes}</td>
+
+              <td>
+                <span class="badge ${esc(attendanceStatus)}">
+                  ${esc(attendanceStatus)}
+                </span>
+              </td>
+
+              <td>
+                <span
+                  class="badge ${esc(
+                    row.registration_status || ""
+                  )}"
+                >
+                  ${esc(row.registration_status || "")}
+                </span>
+              </td>
+
+              <td>
+                ${actions.join(" ")}
+              </td>
+            </tr>
+          `;
+        }
+
+        window.draw = async function () {
+          const eventId = $("event").value;
+          const event = events[eventId];
+
+          if (!event) {
+            $("content").innerHTML = "";
+            return;
+          }
+
+          let rows;
+
+          try {
+            rows = await eatApi.roster(eventId);
+          } catch (error) {
+            toast(error.message);
+            return;
+          }
+
+          const countStatus = (status) =>
+            rows.filter(
+              (row) =>
+                row.attendance_status === status
+            ).length;
+
+          const stats = {
+            Registered: rows.filter(
+              (row) =>
+                row.registration_status === "Registered"
+            ).length,
+
+            Present: countStatus("Present"),
+            Late: countStatus("Late"),
+            Absent: countStatus("Absent")
+          };
+
+          const registrationOpen =
+            system.canRegister(asLocal(event));
+
+          const phase = eventStatus(asLocal(event));
+
+          $("content").innerHTML = `
+            <div class="stats">
+              ${Object.entries(stats)
+                .map(
+                  ([label, number]) =>
+                    `<div class="stat">
+                      <b>${number}</b>
+                      ${label}
+                    </div>`
+                )
+                .join("")}
             </div>
 
-            <span class="badge ${registrationOpen ? 'Ongoing' : eventStatus(event)}">
-              ${registrationOpen ? 'Registration open' : eventStatus(event)}
-            </span>
-          </div>
-
-          ${
-            registrationOpen
-              ? `
-                <form id="reg-form">
-                  <div class="row">
-                    <div>
-                      <label for="sid">Student ID *</label>
-                      <input
-                        id="sid"
-                        required
-                        placeholder="e.g., 2025-12345"
-                      >
-                    </div>
-
-                    <div>
-                      <label for="first">First name *</label>
-                      <input
-                        id="first"
-                        required
-                        placeholder="Student first name"
-                      >
-                    </div>
-
-                    <div>
-                      <label for="last">Last name *</label>
-                      <input
-                        id="last"
-                        required
-                        placeholder="Student last name"
-                      >
-                    </div>
-                  </div>
-
-                  <div class="row">
-                    <div>
-                      <label for="middle">Middle name</label>
-                      <input id="middle" placeholder="Optional">
-                    </div>
-
-                    <div>
-                      <label for="department">Department</label>
-                      <input
-                        id="department"
-                        placeholder="e.g., College of Arts and Sciences"
-                      >
-                    </div>
-
-                    <div>
-                      <label for="course">Program / course</label>
-                      <input
-                        id="course"
-                        placeholder="e.g., BS Information Technology"
-                      >
-                    </div>
-
-                    <div>
-                      <label for="section">Year &amp; section</label>
-                      <input
-                        id="section"
-                        placeholder="e.g., 2 - A"
-                      >
-                    </div>
-                  </div>
-
-                  <label for="proof">Photo proof from the event *</label>
-                  <input
-                    id="proof"
-                    type="file"
-                    accept="image/*"
-                    capture="environment"
-                    required
-                  >
+            <section
+              class="panel"
+              style="margin: 12px 0; background: #f6f9ff"
+            >
+              <div class="title-row">
+                <div>
+                  <h3>Register a student</h3>
 
                   <p class="hint">
-                    Image file up to 1 MB. The photo is stored with this event registration.
+                    Enter the student's details and attach photo proof.
+                    Registration is allowed only while this event is in progress.
                   </p>
-
-                  <div class="actions">
-                    <button type="submit">
-                      Register student &amp; record time-in
-                    </button>
-                  </div>
-                </form>
-              `
-              : `
-                <div class="notice warn">
-                  Student registration opens at ${fmt12(event.start)}
-                  on ${esc(event.date)} and closes at ${fmt12(event.end)}.
-                  It is unavailable right now.
                 </div>
-              `
-          }
-        </section>
 
-        <h3>Registered students</h3>
+                <span
+                  class="badge ${
+                    registrationOpen
+                      ? "Ongoing"
+                      : phase
+                  }"
+                >
+                  ${
+                    registrationOpen
+                      ? "Registration open"
+                      : phase
+                  }
+                </span>
+              </div>
 
-        <div class="table-wrap">
-          <table>
-            <thead>
-              <tr>
-                <th>Student ID</th>
-                <th>Name</th>
-                <th>Department</th>
-                <th>Program / section</th>
-                <th>Time in</th>
-                <th>Proof</th>
-                <th>Status</th>
-                <th>Action</th>
-              </tr>
-            </thead>
-
-            <tbody>
               ${
-                event.attendees.length
-                  ? event.attendees
-                      .map(student => `
-                        <tr>
-                          <td>${esc(student.studentId)}</td>
-                          <td>
-                            ${esc(student.first)}
-                            ${esc(student.middle || '')}
-                            ${esc(student.last)}
-                          </td>
-                          <td>${esc(student.department || '')}</td>
-                          <td>
-                            ${esc(student.course || '')}
-                            ${esc(student.section || '')}
-                          </td>
-                          <td>
-                            ${student.timeIn ? fmt12(student.timeIn) : '—'}
-                          </td>
-                          <td>
-                            ${
-                              student.proof
-                                ? `
-                                  <a
-                                    href="${student.proof}"
-                                    target="_blank"
-                                    rel="noopener"
-                                  >
-                                    <img
-                                      class="proof"
-                                      src="${student.proof}"
-                                      alt="Student event proof"
-                                    >
-                                  </a>
-                                `
-                                : '—'
-                            }
-                          </td>
-                          <td>
-                            <span class="badge ${system.attendeeStatus(event, student)}">
-                              ${system.attendeeStatus(event, student)}
-                            </span>
-                          </td>
-                          <td>
-                            <button
-                              class="danger"
-                              onclick="removeStudent('${esc(student.studentId)}')"
-                            >
-                              Remove
-                            </button>
-                          </td>
-                        </tr>
-                      `)
-                      .join('')
+                registrationOpen
+                  ? `
+                    <form
+                      id="reg-form"
+                      enctype="multipart/form-data"
+                    >
+                      <div
+                        id="registration-warning"
+                        class="notice warn hidden"
+                        style="margin-bottom: 14px"
+                      ></div>
+
+                      <label for="sid">
+                        Existing student ID *
+                      </label>
+
+                      <div class="row">
+                        <input
+                          id="sid"
+                          required
+                          placeholder="e.g., 2025-12345"
+                        />
+
+                        <button
+                          id="find-student"
+                          type="button"
+                        >
+                          Find student
+                        </button>
+                      </div>
+
+                      <div
+                        id="student-preview"
+                        class="notice hidden"
+                        style="margin-top: 14px"
+                      ></div>
+
+                      <p class="hint">
+                        Use a student already saved in the Student Management
+                        section. The student information will be reused for this event.
+                      </p>
+
+                      <label for="proof">
+                        Photo proof from the event *
+                      </label>
+
+                      <input
+                        id="proof"
+                        name="proof"
+                        type="file"
+                        accept="image/jpeg,image/png,image/gif,image/webp"
+                        required
+                      />
+
+                      <p class="hint">
+                        Image file up to 1 MB. The photo is stored with this event registration.
+                      </p>
+
+                      <div class="actions">
+                        <button type="submit">
+                          Register student &amp; record time-in
+                        </button>
+
+                        <a
+                          class="button secondary"
+                          href="students.html"
+                        >
+                          Register new student
+                        </a>
+                      </div>
+                    </form>
+                  `
                   : `
-                    <tr>
-                      <td colspan="8">No students registered yet.</td>
-                    </tr>
+                    <div class="notice warn">
+                      Student registration opens at
+                      ${fmt12(event.start_time)}
+                      on
+                      ${esc(
+                        String(event.event_date).slice(0, 10)
+                      )}
+                      and closes at
+                      ${fmt12(event.end_time)}.
+                      It is unavailable right now.
+                    </div>
                   `
               }
-            </tbody>
-          </table>
-        </div>
-      `;
+            </section>
 
-      const form = $('reg-form');
+            <h3>Registered students</h3>
 
-      if (form) {
-        form.onsubmit = handleRegistration;
-      }
-    }
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Student ID</th>
+                    <th>Name</th>
+                    <th>Department</th>
+                    <th>Program / section</th>
+                    <th>Time in</th>
+                    <th>Proof</th>
+                    <th>Notes</th>
+                    <th>Status</th>
+                    <th>Registration</th>
+                    <th>Action</th>
+                  </tr>
+                </thead>
 
-    async function handleRegistration(event) {
-      event.preventDefault();
-
-      const file = $('proof').files[0];
-
-      if (!file || !file.type.startsWith('image/') || file.size > 1024 * 1024) {
-        alert('Select a valid image up to 1 MB as required proof.');
-        return;
-      }
-
-      const proof = await new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = () => resolve(reader.result);
-        reader.onerror = reject;
-        reader.readAsDataURL(file);
-      });
-
-      const sectionValue = $('section').value.trim();
-      const sectionParts = sectionValue.split(/\s+-\s+/);
-
-      let year = '';
-      let section = '';
-
-      if (sectionParts.length > 1) {
-        year = sectionParts[0];
-        section = sectionParts.slice(1).join(' - ');
-      } else {
-        section = sectionParts[0] || '';
-      }
-
-      const student = {
-        studentId: $('sid').value.trim(),
-        first: $('first').value.trim(),
-        middle: $('middle').value.trim(),
-        last: $('last').value.trim(),
-        department: $('department').value.trim(),
-        course: $('course').value.trim(),
-        year,
-        section
-      };
-
-      if (system.registerStudent($('event').value, student, proof)) {
-        toast('Student registered and time-in recorded.');
-        draw();
-      }
-    }
-
-    function removeStudent(studentId) {
-      if (confirm('Remove this student from the event?')) {
-        system.deleteAttendee($('event').value, studentId);
-        draw();
-      }
-    }
-
-    draw();
-    //(draw, 15000);
-  </script>
-    <script>
-    (async () => {
-      const events = {};
-
-      const asLocal = (ev) => ({ date: ev.event_date, start: ev.start_time, end: ev.end_time });
-
-      async function loadEvents() {
-        const wanted = new URLSearchParams(location.search).get('event');
-        const list = await eatApi.events();
-        $('event').innerHTML = '<option value="">Choose an event…</option>';
-        list.forEach((ev) => {
-          events[ev.event_id] = ev;
-          $('event').insertAdjacentHTML('beforeend',
-            `<option value="${ev.event_id}">${esc(ev.event_name)} · ${esc(ev.event_date)} · ${fmt12(ev.start_time)}</option>`);
-        });
-        if (wanted && events[wanted]) $('event').value = wanted;
-      }
-
-      function rowHtml(r, completed) {
-        const registered = r.registration_status === 'Registered';
-        const status = r.attendance_status || (completed ? 'Not recorded' : 'Registered');
-        const actions = [];
-
-        if (r.attendance_id === null) {
-          actions.push(`<button data-act="record" data-reg="${r.registration_id}">Record time-in</button>`);
-          actions.push(`<button data-act="absent" data-reg="${r.registration_id}">Absent</button>`);
-        } else {
-          actions.push(`<button data-act="edit" data-att="${r.attendance_id}" data-status="${esc(status)}">Edit</button>`);
-        }
-        actions.push(registered
-          ? `<button data-act="cancel" data-reg="${r.registration_id}">Cancel registration</button>`
-          : `<button data-act="reregister" data-reg="${r.registration_id}">Re-register</button>`);
-        actions.push(`<button class="danger" data-act="remove" data-reg="${r.registration_id}">Remove</button>`);
-
-        return `
-          <tr>
-            <td>${esc(r.student_number)}</td>
-            <td>${esc(r.first_name)} ${esc(r.last_name)}</td>
-            <td>${esc(r.department_name || '')}</td>
-            <td>${esc(r.program_name || '')} ${esc(r.year_level + ' - ' + r.section)}</td>
-            <td>${r.time_in ? fmt12(r.time_in.slice(11, 16)) : '—'}</td>
-            <td>—</td>
-            <td><span class="badge ${esc(status)}">${esc(status)}</span></td>
-            <td><span class="badge ${esc(r.registration_status)}">${esc(r.registration_status)}</span></td>
-            <td>${actions.join(' ')}</td>
-          </tr>`;
-      }
-
-      window.draw = async function () {
-        const id = $('event').value;
-        const ev = events[id];
-        if (!ev) { $('content').innerHTML = ''; return; }
-
-        let rows;
-        try { rows = await eatApi.roster(id); }
-        catch (e) { toast(e.message); return; }
-
-        const count = (s) => rows.filter((r) => r.attendance_status === s).length;
-        const stats = {
-          Registered: rows.filter((r) => r.registration_status === 'Registered').length,
-          Present: count('Present'), Late: count('Late'), Absent: count('Absent'),
-        };
-        const open = system.canRegister(asLocal(ev));
-        const phase = eventStatus(asLocal(ev));
-
-        $('content').innerHTML = `
-          <div class="stats">
-            ${Object.entries(stats).map(([label, n]) => `<div class="stat"><b>${n}</b> ${label}</div>`).join('')}
-          </div>
-
-          <section class="panel" style="margin: 12px 0; background: #f6f9ff">
-            <div class="title-row">
-              <div>
-                <h3>Register a student</h3>
-                <p class="hint">Enter the student number of a student already in the system.
-                  Registration is allowed only while this event is in progress.</p>
-              </div>
-              <span class="badge ${open ? 'Ongoing' : phase}">${open ? 'Registration open' : phase}</span>
+                <tbody>
+                  ${
+                    rows.length
+                      ? rows
+                          .map((row) =>
+                            rowHtml(
+                              row,
+                              phase === "Completed"
+                            )
+                          )
+                          .join("")
+                      : `
+                        <tr>
+                          <td colspan="10">
+                            No students registered yet.
+                          </td>
+                        </tr>
+                      `
+                  }
+                </tbody>
+              </table>
             </div>
-            ${open ? `
-              <form id="reg-form">
-                <label for="sid">Student ID *</label>
-                <input id="sid" required placeholder="e.g., 202521051">
-                <div class="actions"><button type="submit">Register student &amp; record time-in</button></div>
-              </form>`
-            : `<div class="notice warn">Student registration opens at ${fmt12(ev.start_time)} on ${esc(ev.event_date)}
-                and closes at ${fmt12(ev.end_time)}. It is unavailable right now.</div>`}
-          </section>
+          `;
 
-          <h3>Registered students</h3>
-          <div class="table-wrap">
-            <table>
-              <thead>
-                <tr><th>Student ID</th><th>Name</th><th>Department</th><th>Program / section</th>
-                    <th>Time in</th><th>Proof</th><th>Status</th><th>Registration</th><th>Action</th></tr>
-              </thead>
-              <tbody>
-                ${rows.length ? rows.map((r) => rowHtml(r, phase === 'Completed')).join('') : '<tr><td colspan="9">No students registered yet.</td></tr>'}
-              </tbody>
-            </table>
-          </div>`;
+          const form = $("reg-form");
 
-        const form = $('reg-form');
-        if (form) form.onsubmit = async (e) => {
-          e.preventDefault();
-          try {
-            const number = $('sid').value.trim();
-            const student = await eatApi.findStudentByNumber(number);
-            if (!student) throw new Error('Student number not found in the database.');
-            const reg = await eatApi.register(student.student_id, Number(id));
-            await eatApi.recordAttendance(reg.registrationId);
-            toast('Student registered and time-in recorded.');
-            await window.draw();
-          } catch (err) { toast(err.message); }
-        };
-      };
+          function showRegistrationError(error) {
+            const message = String(
+              error?.message ||
+                "Registration could not be completed."
+            );
 
-      $('content').onclick = async (e) => {
-        const b = e.target.closest('button[data-act]');
-        if (!b) return;
-        const act = b.dataset.act, reg = Number(b.dataset.reg), att = Number(b.dataset.att);
-        try {
-          if (act === 'record') { await eatApi.recordAttendance(reg); toast('Time-in recorded.'); }
-          else if (act === 'absent') { await eatApi.recordAttendance(reg, 'Absent'); toast('Marked absent.'); }
-          else if (act === 'edit') {
-            const status = prompt('New status (Present, Late or Absent):', b.dataset.status);
-            if (!status) return;
-            const payload = { status };
-            if (status !== 'Absent') {
-              const timeIn = prompt('Time in (YYYY-MM-DD HH:mm), leave empty to keep:', '');
-              if (timeIn) payload.timeIn = timeIn;
+            const warning = $(
+              "registration-warning"
+            );
+
+            if (
+              warning &&
+              message
+                .toLowerCase()
+                .includes("not eligible")
+            ) {
+              warning.textContent =
+                "You are not allowed to register for this event because your program is not eligible for it.";
+
+              warning.classList.remove("hidden");
+
+              return;
             }
-            await eatApi.editAttendance(att, payload);
-            toast('Attendance updated.');
-          }
-          else if (act === 'cancel') { await eatApi.setRegistrationStatus(reg, 'Cancelled'); toast('Registration cancelled.'); }
-          else if (act === 'reregister') { await eatApi.setRegistrationStatus(reg, 'Registered'); toast('Student re-registered.'); }
-          else if (act === 'remove') {
-            if (!confirm('Remove this registration?')) return;
-            await eatApi.removeRegistration(reg);
-            toast('Registration removed.');
-          }
-          await window.draw();
-        } catch (err) { toast(err.message); }
-      };
 
-      try { await loadEvents(); await window.draw(); }
-      catch (e) { toast(e.message); }
-    })();
-  </script>
-</body>
+            toast(message);
+          }
+
+          if (form) {
+            $("find-student").onclick =
+              async () => {
+                const studentNumber =
+                  $("sid").value.trim();
+
+                const preview =
+                  $("student-preview");
+
+                selectedStudentId = null;
+
+                preview.classList.add("hidden");
+
+                const warning = $(
+                  "registration-warning"
+                );
+
+                if (warning) {
+                  warning.classList.add("hidden");
+                  warning.textContent = "";
+                }
+
+                if (!studentNumber) {
+                  toast("Enter a student ID first.");
+                  return;
+                }
+
+                try {
+                  const student =
+                    await eatApi.findStudentByNumber(
+                      studentNumber
+                    );
+
+                  if (!student) {
+                    preview.textContent =
+                      "Student not found. Use Register new student to add this student first.";
+
+                    preview.classList.remove(
+                      "hidden"
+                    );
+
+                    return;
+                  }
+
+                  const eligibility =
+                    await eatApi.checkEligibility(
+                      Number(student.student_id),
+                      Number(eventId)
+                    );
+
+                  if (!eligibility.eligible) {
+                    preview.textContent =
+                      "You are not allowed to register this student for this event because the student's program is not eligible.";
+
+                    preview.classList.remove(
+                      "hidden"
+                    );
+
+                    selectedStudentId = null;
+
+                    return;
+                  }
+
+                  selectedStudentId = Number(
+                    student.student_id
+                  );
+
+                  preview.innerHTML = `
+                    <strong>
+                      ${esc(student.first_name)}
+                      ${esc(student.last_name)}
+                    </strong>
+                      
+
+                    Student ID:
+                    ${esc(student.student_number)}
+                      
+
+                    Program:
+                    ${esc(student.program_name || "")}
+                      
+
+                    Department:
+                    ${esc(student.department_name || "")}
+                      
+
+                    Year and section:
+                    ${esc(
+                      [
+                        student.year_level,
+                        student.section
+                      ]
+                        .filter(Boolean)
+                        .join(" - ")
+                    )}
+                  `;
+
+                  preview.classList.remove(
+                    "hidden"
+                  );
+                } catch (error) {
+                  toast(error.message);
+                }
+              };
+
+            $("sid").oninput = () => {
+              selectedStudentId = null;
+
+              $("student-preview").classList.add(
+                "hidden"
+              );
+
+              const warning = $(
+                "registration-warning"
+              );
+
+              if (warning) {
+                warning.classList.add("hidden");
+                warning.textContent = "";
+              }
+            };
+
+            form.onsubmit = async (
+              eventObject
+            ) => {
+              eventObject.preventDefault();
+
+              try {
+                if (!selectedStudentId) {
+                  throw new Error(
+                    "Find a valid eligible student before registering."
+                  );
+                }
+
+                const photo =
+                  $("proof").files[0];
+
+                if (!photo) {
+                  throw new Error(
+                    "Please select the required photo proof."
+                  );
+                }
+
+                if (
+                  ![
+                    "image/jpeg",
+                    "image/png",
+                    "image/gif",
+                    "image/webp"
+                  ].includes(photo.type)
+                ) {
+                  throw new Error(
+                    "Photo proof must be a JPEG, PNG, GIF, or WEBP image."
+                  );
+                }
+
+                if (photo.size > 1024 * 1024) {
+                  throw new Error(
+                    "The photo must be 1 MB or smaller."
+                  );
+                }
+
+                const registration =
+                  await eatApi.register(
+                    selectedStudentId,
+                    Number(eventId),
+                    photo
+                  );
+
+                await eatApi.recordAttendance(
+                  registration.registrationId
+                );
+
+                toast(
+                  "Photo proof saved; student registered and time-in recorded."
+                );
+
+                await window.draw();
+              } catch (error) {
+                showRegistrationError(error);
+              }
+            };
+          }
+        };
+
+        $("content").onclick = async (
+          eventObject
+        ) => {
+          const button =
+            eventObject.target.closest(
+              "button[data-act]"
+            );
+
+          if (!button) return;
+
+          const action = button.dataset.act;
+          const registrationId = Number(
+            button.dataset.reg
+          );
+          const attendanceId = Number(
+            button.dataset.att
+          );
+
+          try {
+            if (action === "record") {
+              await eatApi.recordAttendance(
+                registrationId
+              );
+
+              toast("Time-in recorded.");
+            } else if (action === "absent") {
+              await eatApi.recordAttendance(
+                registrationId,
+                "Absent"
+              );
+
+              toast("Marked absent.");
+            } else if (action === "edit") {
+              const status = prompt(
+                "New status (Present, Late or Absent):",
+                button.dataset.status
+              );
+
+              if (!status) return;
+
+              const payload = {
+                status
+              };
+
+              if (status !== "Absent") {
+                const timeIn = prompt(
+                  "Time in (YYYY-MM-DD HH:mm), leave empty to keep:",
+                  ""
+                );
+
+                if (timeIn) {
+                  payload.timeIn = timeIn;
+                }
+              }
+
+              await eatApi.editAttendance(
+                attendanceId,
+                payload
+              );
+
+              toast("Attendance updated.");
+            } else if (action === "note") {
+              const noteText = prompt(
+                "Attendance note (maximum 255 characters):",
+                ""
+              );
+
+              if (!noteText || !noteText.trim()) return;
+
+              await eatApi.addAttendanceNote(
+                attendanceId,
+                noteText.trim()
+              );
+
+              toast("Attendance note added.");
+            } else if (action === "cancel") {
+              await eatApi.setRegistrationStatus(
+                registrationId,
+                "Cancelled"
+              );
+
+              toast("Registration cancelled.");
+            } else if (action === "reregister") {
+              await eatApi.setRegistrationStatus(
+                registrationId,
+                "Registered"
+              );
+
+              toast("Student re-registered.");
+            } else if (action === "remove") {
+              if (
+                !confirm(
+                  "Remove this registration?"
+                )
+              ) {
+                return;
+              }
+
+              await eatApi.removeRegistration(
+                registrationId
+              );
+
+              toast("Registration removed.");
+            }
+
+            await window.draw();
+          } catch (error) {
+            toast(error.message);
+          }
+        };
+
+        try {
+          await loadEvents();
+          await window.draw();
+        } catch (error) {
+          toast(error.message);
+        }
+      })();
+    </script>
+  </body>
 </html>
