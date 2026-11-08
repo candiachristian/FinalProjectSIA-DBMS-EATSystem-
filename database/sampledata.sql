@@ -1,6 +1,6 @@
 USE event_attendance_db;
  
-INSERT IGNORE INTO roles (role_name)
+INSERT INTO roles (role_name)
 VALUES ('admin');
  
 INSERT IGNORE INTO departments (department_name)
@@ -55,7 +55,8 @@ WHERE NOT EXISTS (
 );
  
 INSERT IGNORE INTO academic_terms (term_name)
-VALUES ('First Semester 2026-2027');
+VALUES ('First Semester 2026-2027'),
+       ('Second Semester 2026-2027');
  
 
 INSERT IGNORE INTO users (username, password_hash, role_id)
@@ -150,17 +151,7 @@ WHERE program_name = 'BS Business Administration'
   AND NOT EXISTS (
       SELECT 1 FROM students WHERE student_number = '20250005'
   );
- 
-INSERT INTO students
-    (student_number, first_name, last_name, program_id,
-     year_level, section, email)
-SELECT
-    '20250004', 'Ana', 'Reyes', NULL,
-    1, 'A', 'anareyes@example.edu'
-FROM DUAL
-WHERE NOT EXISTS (
-    SELECT 1 FROM students WHERE student_number = '20250004'
-);
+
  
 INSERT INTO events
     (event_name, event_date, start_time, end_time,
