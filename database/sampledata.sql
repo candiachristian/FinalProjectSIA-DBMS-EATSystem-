@@ -54,12 +54,12 @@ WHERE NOT EXISTS (
       AND location = 'CAS Building, Room 201'
 );
  
-INSERT IGNORE INTO academic_terms (term_name)
+INSERT INTO academic_terms (term_name)
 VALUES ('First Semester 2026-2027'),
        ('Second Semester 2026-2027');
  
 
-INSERT IGNORE INTO users (username, password_hash, role_id)
+INSERT INTO users (username, password_hash, role_id)
 SELECT
     'admin',
     '$2b$10$n1prwxQ/JJCP0F2ehYuH/uFRHKkaMznuggJDAh3O7BZSd9Kx3VF/m',
@@ -67,37 +67,37 @@ SELECT
 FROM roles
 WHERE role_name = 'admin';
 
-INSERT IGNORE INTO programs (program_name, department_id)
+INSERT INTO programs (program_name, department_id)
 SELECT 'BS Information Technology', department_id
 FROM departments
 WHERE department_name = 'College of Arts and sciences';
  
-INSERT IGNORE INTO programs (program_name, department_id)
+INSERT INTO programs (program_name, department_id)
 SELECT 'BS Computer Science', department_id
 FROM departments
 WHERE department_name = 'College of Arts and sciences';  -- 
  
-INSERT IGNORE INTO programs (program_name, department_id)
+INSERT INTO programs (program_name, department_id)
 SELECT 'BS Computer Engineering', department_id
 FROM departments
 WHERE department_name = 'College of Engineering';
  
-INSERT IGNORE INTO programs (program_name, department_id)
+INSERT INTO programs (program_name, department_id)
 SELECT 'BS Business Administration', department_id
 FROM departments
 WHERE department_name = 'College of Business Administration';
  
-INSERT IGNORE INTO programs (program_name, department_id)
+INSERT INTO programs (program_name, department_id)
 SELECT 'BS Civil Engineering', department_id
 FROM departments
 WHERE department_name = 'College of Engineering';
 
-INSERT IGNORE INTO programs (program_name, department_id)
+INSERT INTO programs (program_name, department_id)
 SELECT 'Bachelor of Physical Education', department_id
 FROM departments
 WHERE department_name = 'College of Education';
 
-INSERT IGNORE INTO programs (program_name, department_id)
+INSERT INTO programs (program_name, department_id)
 SELECT 'Bachelor of Educational Technology', department_id
 FROM departments
 WHERE department_name = 'College of Education';
@@ -267,7 +267,7 @@ WHERE s.student_number = '20250002'
       WHERE a.registration_id = r.registration_id
   );
  
-INSERT IGNORE INTO event_programs (event_id, program_id)
+INSERT INTO event_programs (event_id, program_id)
 SELECT e.event_id, p.program_id
 FROM events e
 JOIN programs p ON p.program_name IN (
@@ -276,7 +276,7 @@ JOIN programs p ON p.program_name IN (
 )
 WHERE e.event_name = 'IT Orientation';
  
-INSERT IGNORE INTO event_programs (event_id, program_id)
+INSERT INTO event_programs (event_id, program_id)
 SELECT e.event_id, p.program_id
 FROM events e
 JOIN programs p ON p.program_name = 'BS Information Technology'
